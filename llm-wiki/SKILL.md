@@ -192,15 +192,10 @@ unless asked.
 
 ## Lint
 
-Report only — never auto-edit. Check: index/filesystem sync, broken
-links, frontmatter source resolution, See Also bidirectionality,
-orphans, stale claims, concept gaps, index bloat. Post findings to
-`log.md`.
-
-**Minimal search.** At small scale (<100 pages), `grep -r` over the
-wiki directory is sufficient. At larger scale, consider `qmd`
-(https://github.com/tobi/qmd) or similar. The index file is the primary
-navigation aid; search is a convenience layer.
+Fix deterministic issues automatically: index/filesystem sync, broken
+links, See Also bidirectionality, raw reference validity. Report
+heuristic issues to the user: contradictions, stale claims, concept
+gaps, orphans, index bloat. Post all findings to `log.md`.
 
 ## Rules
 
