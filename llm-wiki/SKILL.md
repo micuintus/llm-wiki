@@ -163,9 +163,14 @@ filing.
 ### Special source types
 
 **Sessions.** Pi sessions are JSONL trees — see
-`references/pi-session-recipe.md`. Other agents (Claude Code, opencode,
-web) are linear transcripts. Extract every cited source as its own
-ingestion; prefer underlying source over session.
+`references/pi-session-recipe.md`. **CRITICAL:** Sessions are NOT
+chronological streams. They have forks (resumed conversations, subagent
+spawns), custom events (fetch failures, rate limits, errors), and
+tool-call branches where the assistant produced artifacts with no text
+reply. You MUST run tree analysis (Step 0 in the recipe) before reading
+any content. Other agents (Claude Code, opencode, web) are linear
+transcripts. Extract every cited source as its own ingestion; prefer
+underlying source over session.
 
 **Figures / screenshots / audio / MIDI / checkpoints.** Same pattern:
 bucket per kind (`figures/`, `audio/`, etc.), reference if stable, copy
