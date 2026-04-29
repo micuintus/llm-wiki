@@ -168,9 +168,12 @@ chronological streams. They have forks (resumed conversations, subagent
 spawns), custom events (fetch failures, rate limits, errors), and
 tool-call branches where the assistant produced artifacts with no text
 reply. You MUST run tree analysis (Step 0 in the recipe) before reading
-any content. Other agents (Claude Code, opencode, web) are linear
-transcripts. Extract every cited source as its own ingestion; prefer
-underlying source over session.
+any content. For Claude Code (`~/.claude/projects/<sanitized-cwd>/*.jsonl`),
+Gemini CLI (`~/.gemini/tmp/<project>/chats/*.json`), and opencode
+(`~/.local/share/opencode/opencode.db` SQLite), see
+`references/agent-session-recipe.md` — load it only when actually scanning
+one of these tools' transcripts, not on general skill load. Extract every
+cited source as its own ingestion; prefer underlying source over session.
 
 **Figures / screenshots / audio / MIDI / checkpoints.** Same pattern:
 bucket per kind (`figures/`, `audio/`, etc.), reference if stable, copy
