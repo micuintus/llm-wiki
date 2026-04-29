@@ -6,7 +6,12 @@ The user curates sources. The LLM does the bookkeeping — summarizing, cross-li
 
 ## Install
 
-### Pi
+### Pi (npm — recommended)
+```bash
+pi install npm:@micuintus/llm-wiki
+```
+
+### Pi (git)
 ```bash
 pi install https://github.com/micuintus/llm-wiki
 ```
