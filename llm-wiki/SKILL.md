@@ -79,6 +79,36 @@ Run inline as Step 0 of first ingest:
 Continue into Ingest step 1. If user runs Query/Lint before any ingest,
 tell them to ingest first; do not auto-create.
 
+## Page types
+
+Use exactly one per page:
+
+- `concept` — what something is (architecture, math, mechanism)
+- `decision` — why X was chosen over Y (diff table, alternatives, evidence)
+- `bug` / `bugfix` — what was wrong and how fixed (before/after code, impact, regression test)
+- `open-question` — known unknown with monitor/trigger/defer pattern
+- `source` — session or document summary (terse pointer, not deep content)
+- `reference` — commands, configs, API docs (lookup table, not narrative)
+- `synthesis` — filed query answer (cites wiki pages, not raw sources)
+
+## Page quality heuristics
+
+Before marking a page "done", verify depth matches type:
+
+| Type | Minimum depth |
+|------|---------------|
+| `concept` | ≥1 table, ≥1 code block, ≥3 paragraphs of body |
+| `decision` | alternatives-considered table with evidence, ≥3 paragraphs |
+| `bug` / `bugfix` | before/after code snippet, impact assessment, regression test ref |
+| `open-question` | symptoms, mitigations, trigger conditions, proposed fix |
+| `source` | metadata + key content + reliability — can be terse |
+| `reference` | lookup table or command list — can be terse |
+| `synthesis` | cites ≥2 wiki pages, adds new connection or conclusion |
+
+Thin pages (frontmatter + one paragraph + See Only) are stubs. Stubs
+are acceptable for `source` and `reference`, but not for `concept`,
+`decision`, or `bug`.
+
 ## Ingest
 
 Two stages: register, then compile. Never one without the other.
@@ -129,6 +159,7 @@ natural.
 **Done means** — before finishing compile, verify:
 - Frontmatter: `title`, `type`, `updated`, `sources` all present
 - Body: one-paragraph hook + Key claims (cited) + Open questions
+- Depth: passes the page quality heuristics for its type
 - See Also: if this page mentions a concept that has its own page, link
   it here; if you add a See Also to page A pointing to page B, ensure
   B links back to A
@@ -191,8 +222,13 @@ and which concepts it touches. Then merge into canonical pages. Example:
 ## Query
 
 Read `index.md`, find candidates, read pages, synthesize with citations.
-Prefer wiki over training; say so if coverage is missing. Don't write
-unless asked.
+Prefer wiki over training; say so if coverage is missing.
+
+**Filing:** If the answer synthesizes ≥2 wiki pages or discovers a new
+connection not yet documented, offer to file it as a `type: synthesis`
+page. Synthesis pages cite their source wiki pages (not raw sources) and
+are indexed under a "Synthesis" section. This prevents good answers from
+disappearing into chat history.
 
 **Archive** (on request): synthesis page with `type: synthesis` or
 `archive`, `sources:` listing cited wiki pages, update `index.md` with
@@ -201,9 +237,32 @@ unless asked.
 ## Lint
 
 Fix deterministic issues automatically: index/filesystem sync, broken
-links, See Also bidirectionality, raw reference validity. Report
-heuristic issues to the user: contradictions, stale claims, concept
-gaps, orphans, index bloat. Post all findings to `log.md`.
+links, See Also bidirectionality, raw reference validity, frontmatter
+type consistency (types must be from the canonical list).
+
+Report heuristic issues to the user:
+- **Contradictions:** grep for antonym pairs across pages on same topic
+  (e.g., "adopted" vs "rejected", "works" vs "broken"). Flag with:
+  `⚠️ CONTRADICTION: [page A] claims X, but [page B] claims not-X.`
+- **Stale claims:** `updated:` older than SCHEMA's stale threshold
+  (default 30 days) on pages whose topic has seen recent ingest.
+- **Thin pages:** body shorter than the quality heuristic for its type.
+- **Orphans:** pages with no inbound links from other content pages.
+- **Concept gaps:** concepts mentioned in See Also that lack their own page.
+- **Index bloat:** index entries without corresponding files.
+
+Post all findings to `log.md`.
+
+## Schema co-evolution
+
+The schema evolves when any of these trigger:
+- New bucket needed (source kind not in SCHEMA buckets list)
+- New topic needed (concept doesn't fit existing taxonomy)
+- Type misuse pattern (same concept tagged as multiple types)
+- Systemic lint finding (e.g., all pages of type X lack Y)
+- User request for new convention
+
+Propose changes to SCHEMA.md; user approves or revises.
 
 ## Rules
 
@@ -221,3 +280,14 @@ gaps, orphans, index bloat. Post all findings to `log.md`.
 - **Frontmatter** (mandatory): `title`, `type`, `updated`, `sources`.
   Optional: `see_also`, `tags`.
 - **Links.** Standard markdown.
+
+## Optional tooling
+
+The skill works without any tools, but these improve the experience:
+
+- **Obsidian** for browsing: graph view shows page connectivity; Dataview
+  queries frontmatter for dynamic tables.
+- **qmd** for search at scale (>100 pages): hybrid BM25/vector search
+  with LLM re-ranking, CLI + MCP server.
+- **Web Clipper** for sources: browser extension converts articles to
+  markdown for quick ingestion.
