@@ -1,57 +1,36 @@
 #!/usr/bin/env tsx
 // LLM Wiki subskill: ingest a single web LLM chat into a wiki raw-source.
-//
-// Usage:
-//   tsx ingest.ts <chat-url> [--out <wiki-root>] [--headed] [--login]
-//
-// On first run for a provider, pass --login to open a window so you can
-// authenticate. Cookies persist in ./.userdata/ for subsequent headless runs.
+// Usage: tsx ingest.ts <chat-url> [--out <wiki-root>]
+// Requires: a Chrome launched with --remote-debugging-port=9222.
 
 import { chromium, type BrowserContext, type Page } from "rebrowser-playwright-core";
 import TurndownService from "turndown";
 import { mkdir, writeFile, readFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { extractClaude, CLAUDE_HOSTS, type RawChat } from "./providers/claude.ts";
 import { extractGemini, GEMINI_HOSTS } from "./providers/gemini.ts";
 import { extractFallback } from "./providers/_fallback.ts";
 
-const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
-const USER_DATA_DIR = join(SKILL_DIR, ".userdata");
-
 interface Args {
   url: string;
   out: string;
-  headed: boolean;
-  login: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Partial<Args> = { headed: false, login: false };
+  const args: Partial<Args> = {};
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--headed") args.headed = true;
-    else if (a === "--login") {
-      args.login = true;
-      args.headed = true;
-    } else if (a === "--out") args.out = argv[++i];
+    if (a === "--out") args.out = argv[++i];
     else rest.push(a);
   }
   if (!rest[0]) {
-    console.error(
-      "Usage: tsx ingest.ts <chat-url> [--out <wiki-root>] [--headed] [--login]",
-    );
+    console.error("Usage: tsx ingest.ts <chat-url> [--out <wiki-root>]");
     process.exit(2);
   }
-  return {
-    url: rest[0],
-    out: resolve(args.out ?? process.cwd()),
-    headed: !!args.headed,
-    login: !!args.login,
-  };
+  return { url: rest[0], out: resolve(args.out ?? process.cwd()) };
 }
 
 function pickProvider(url: string): "claude" | "gemini" | "unknown" {
@@ -64,40 +43,21 @@ function pickProvider(url: string): "claude" | "gemini" | "unknown" {
 const CDP_ENDPOINT = process.env.LLM_WIKI_CDP ?? "http://localhost:9222";
 
 async function withContext<T>(
-  _headed: boolean,
   fn: (ctx: BrowserContext) => Promise<T>,
 ): Promise<T> {
-  if (!existsSync(USER_DATA_DIR)) await mkdir(USER_DATA_DIR, { recursive: true });
   const browser = await chromium.connectOverCDP(CDP_ENDPOINT);
   const ctx = browser.contexts()[0] ?? (await browser.newContext());
   try {
     return await fn(ctx);
   } finally {
-    // Do not close the context — that would close the user's Chrome window.
-    // Just disconnect from CDP.
+    // Disconnect only — closing the context would close the user's Chrome.
     await browser.close();
   }
 }
 
-async function loginFlow(url: string): Promise<void> {
-  console.error(
-    "[login] Opening browser. Sign in to the chat provider, then close the window when done.",
-  );
-  await withContext(true, async (ctx) => {
-    const page = await ctx.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded" });
-    // Wait for the user to close the window manually.
-    await new Promise<void>((resolveClose) => {
-      ctx.on("close", () => resolveClose());
-      page.on("close", () => resolveClose());
-    });
-  });
-  console.error("[login] Session saved to " + USER_DATA_DIR);
-}
-
-async function extract(url: string, headed: boolean): Promise<RawChat> {
+async function extract(url: string): Promise<RawChat> {
   const provider = pickProvider(url);
-  return withContext(headed, async (ctx) => {
+  return withContext(async (ctx) => {
     const page: Page = await ctx.newPage();
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
@@ -203,10 +163,6 @@ async function writeIntoWiki(
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (args.login) {
-    await loginFlow(args.url);
-    return;
-  }
   const wikiRoot = await findWikiRoot(args.out);
   if (!wikiRoot) {
     console.error(
@@ -216,10 +172,10 @@ async function main() {
   }
 
   console.error(`[ingest] ${args.url}`);
-  const chat = await extract(args.url, args.headed);
+  const chat = await extract(args.url);
   if (!chat.turns.length) {
     console.error(
-      "[ingest] No turns extracted. The page may not be loaded, or you are not logged in. Re-run with --login first.",
+      "[ingest] No turns extracted. Is your CDP Chrome running and signed in to the provider?",
     );
     process.exit(1);
   }
