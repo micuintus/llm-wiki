@@ -83,31 +83,16 @@ tell them to ingest first; do not auto-create.
 
 Use exactly one per page:
 
-- `concept` — what something is (architecture, math, mechanism)
-- `decision` — why X was chosen over Y (diff table, alternatives, evidence)
-- `bug` / `bugfix` — what was wrong and how fixed (before/after code, impact, regression test)
-- `open-question` — known unknown with monitor/trigger/defer pattern
-- `source` — session or document summary (terse pointer, not deep content)
-- `reference` — commands, configs, API docs (lookup table, not narrative)
+- `concept` — what something is
+- `decision` — why X was chosen over Y
+- `bug` / `bugfix` — what was wrong and how fixed
+- `open-question` — known unknown
+- `source` — session or document summary
+- `reference` — commands, configs, lookup tables
 - `synthesis` — filed query answer (cites wiki pages, not raw sources)
 
-## Page quality heuristics
-
-Before marking a page "done", verify depth matches type:
-
-| Type | Minimum depth |
-|------|---------------|
-| `concept` | ≥1 table, ≥1 code block, ≥3 paragraphs of body |
-| `decision` | alternatives-considered table with evidence, ≥3 paragraphs |
-| `bug` / `bugfix` | before/after code snippet, impact assessment, regression test ref |
-| `open-question` | symptoms, mitigations, trigger conditions, proposed fix |
-| `source` | metadata + key content + reliability — can be terse |
-| `reference` | lookup table or command list — can be terse |
-| `synthesis` | cites ≥2 wiki pages, adds new connection or conclusion |
-
-Thin pages (frontmatter + one paragraph + See Only) are stubs. Stubs
-are acceptable for `source` and `reference`, but not for `concept`,
-`decision`, or `bug`.
+Depth/quality rules per type live in `references/quality.md` — read
+that when finishing a page.
 
 ## Ingest
 
@@ -156,14 +141,7 @@ Pages per source = distinct theses present. No quota; don't pad with
 fragments. Cluster theses around one core idea into one page when
 natural.
 
-**Done means** — before finishing compile, verify:
-- Frontmatter: `title`, `type`, `updated`, `sources` all present
-- Body: one-paragraph hook + Key claims (cited) + Open questions
-- Depth: passes the page quality heuristics for its type
-- See Also: if this page mentions a concept that has its own page, link
-  it here; if you add a See Also to page A pointing to page B, ensure
-  B links back to A
-- Index: page appears in `index.md` with one-line summary
+See `references/quality.md` for the done-checklist before finishing.
 
 ### 4. Cascade
 
@@ -193,39 +171,19 @@ filing.
 
 ### Special source types
 
-**Sessions.** Pi sessions are JSONL trees — see
-`references/pi-session-recipe.md`. **CRITICAL:** Sessions are NOT
-chronological streams. They have forks (resumed conversations, subagent
-spawns), custom events (fetch failures, rate limits, errors), and
-tool-call branches where the assistant produced artifacts with no text
-reply. You MUST run tree analysis (Step 0 in the recipe) before reading
-any content. For Claude Code (`~/.claude/projects/<sanitized-cwd>/*.jsonl`),
-Gemini CLI (`~/.gemini/tmp/<project>/chats/*.json`), and opencode
-(`~/.local/share/opencode/opencode.db` SQLite), see
-`references/agent-session-recipe.md` — load it only when actually scanning
-one of these tools' transcripts, not on general skill load. Extract every
-cited source as its own ingestion; prefer underlying source over session.
+**Pi sessions** — JSONL trees with forks. See
+`references/pi-session-recipe.md`; Step 0 (fork detection) is mandatory.
 
-**Web LLM chats** (Claude.ai, ChatGPT, Gemini, Le Chat). Use the
-`ingest-web-chat` subskill at `skills/ingest-web-chat/`: hand it a chat URL and
-it drives a real Chrome via CDP (so enterprise SSO works), extracts
-role-segmented turns, and writes a `type: source` markdown into
-`raw-sources/conversations/`. Compile into wiki pages from there as
-usual. See `skills/ingest-web-chat/SKILL.md` for setup (one-time Chrome
-launch with `--remote-debugging-port=9222`).
+**Other agent sessions** — Claude Code, Gemini CLI, opencode. See
+`references/agent-session-recipe.md` (lazy-load when scanning a transcript).
 
-**Figures / screenshots / audio / MIDI / checkpoints.** Same pattern:
-bucket per kind (`figures/`, `audio/`, etc.), reference if stable, copy
-if ephemeral. Always pair with a companion `.md` description (verbatim
-text + 1–3 sentences) — this is the searchable handle. Cite the `.md`,
-not the binary.
+**Web LLM chats** (Claude.ai, ChatGPT, Gemini, Le Chat) — use
+`skills/ingest-web-chat/` (CDP-driven, enterprise-SSO-safe). Hand it a
+URL; it writes a `type: source` markdown into `raw-sources/conversations/`.
 
-**Source summary pages.** For significant sources, first write a
-`type: source` page summarizing what the source claims, its reliability,
-and which concepts it touches. Then merge into canonical pages. Example:
-`raw-sources/papers/2026-04-29-attention.md` →
-`wiki/sources/attention-is-all-you-need.md` (source page) → updates to
-`wiki/concepts/transformers.md`.
+**Figures / screenshots / audio / checkpoints** — bucket per kind,
+reference if stable, copy if ephemeral. Always pair binaries with a
+companion `.md` (verbatim text + 1–3 sentences) — cite the `.md`.
 
 ## Query
 
@@ -291,11 +249,4 @@ Propose changes to SCHEMA.md; user approves or revises.
 
 ## Optional tooling
 
-The skill works without any tools, but these improve the experience:
-
-- **Obsidian** for browsing: graph view shows page connectivity; Dataview
-  queries frontmatter for dynamic tables.
-- **qmd** for search at scale (>100 pages): hybrid BM25/vector search
-  with LLM re-ranking, CLI + MCP server.
-- **Web Clipper** for sources: browser extension converts articles to
-  markdown for quick ingestion.
+See `references/tooling.md` (Obsidian, qmd, Web Clipper, ingest-web-chat).

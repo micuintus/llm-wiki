@@ -1,12 +1,11 @@
 ---
 name: ingest-web-chat
 description: |
-  LLM Wiki subskill: ingest a single web LLM chat (Claude.ai, ChatGPT,
-  Gemini, Le Chat) by URL into a wiki's raw-sources/conversations/.
-  Uses Playwright-managed Chromium with a persistent profile so
-  enterprise SSO sessions are reused. Trigger when the user asks to
-  "ingest this chat", "import this Claude/ChatGPT/Gemini conversation",
-  or hands over a chat URL with intent to add it to the wiki.
+  Ingest a single web LLM chat (Claude.ai, ChatGPT, Gemini, Le Chat) by
+  URL into a wiki's raw-sources/conversations/. Drives a real Chrome via
+  CDP (--remote-debugging-port=9222) so enterprise SSO works. Trigger
+  on "ingest this chat", "import this Claude/ChatGPT/Gemini
+  conversation", or any chat URL the user wants in the wiki.
 ---
 
 # ingest-web-chat
