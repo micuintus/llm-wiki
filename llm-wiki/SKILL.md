@@ -206,6 +206,14 @@ Gemini CLI (`~/.gemini/tmp/<project>/chats/*.json`), and opencode
 one of these tools' transcripts, not on general skill load. Extract every
 cited source as its own ingestion; prefer underlying source over session.
 
+**Web LLM chats** (Claude.ai, ChatGPT, Gemini, Le Chat). Use the
+`ingest-web-chat` subskill at `skills/ingest-web-chat/`: hand it a chat URL and
+it drives a real Chrome via CDP (so enterprise SSO works), extracts
+role-segmented turns, and writes a `type: source` markdown into
+`raw-sources/conversations/`. Compile into wiki pages from there as
+usual. See `skills/ingest-web-chat/SKILL.md` for setup (one-time Chrome
+launch with `--remote-debugging-port=9222`).
+
 **Figures / screenshots / audio / MIDI / checkpoints.** Same pattern:
 bucket per kind (`figures/`, `audio/`, etc.), reference if stable, copy
 if ephemeral. Always pair with a companion `.md` description (verbatim
