@@ -1,0 +1,19 @@
+{
+  "name": "ingest-web-chat",
+  "version": "0.1.0",
+  "description": "LLM Wiki subskill: ingest a single web LLM chat (Claude.ai, ChatGPT, Gemini, Le Chat) via Playwright + Defuddle/Turndown into a wiki raw-source.",
+  "type": "module",
+  "scripts": {
+    "ingest": "tsx ingest.ts"
+  },
+  "dependencies": {
+    "@types/node": "^25.6.0",
+    "@types/turndown": "^5.0.6",
+    "defuddle": "^0.18.1",
+    "playwright-core": "^1.59.1",
+    "rebrowser-playwright-core": "^1.52.0",
+    "tsx": "^4.21.0",
+    "turndown": "^7.2.4",
+    "typescript": "^6.0.3"
+  }
+}
