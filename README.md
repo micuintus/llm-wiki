@@ -2,7 +2,9 @@
 
 Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) as a **minimal, razor-sharp skill** for Pi and other agents.
 
-The user curates sources. The LLM does the bookkeeping — summarizing, cross-linking, flagging contradictions. Knowledge compounds in the wiki rather than being re-derived from raw chunks on every query.
+The user curates sources. The LLM does the bookkeeping — summarizing,
+cross-linking, flagging contradictions. Knowledge compounds in the wiki
+rather than being re-derived from raw chunks on every query.
 
 ## Design philosophy
 
@@ -23,6 +25,11 @@ detection), Claude Code JSONL, opencode SQLite, and Gemini CLI JSON are
 all supported. Session recipes are **lazy-loaded** — referenced by path
 in `SKILL.md`, not inlined. They only load when you actually scan
 sessions, never on general skill load.
+
+**Web LLM chats are first-class.** The `ingest-web-chat` subskill imports
+single chats from Claude.ai, ChatGPT, Gemini, and Le Chat by URL via
+CDP against a real Chrome — the only reliable path past Cloudflare
+Turnstile and enterprise SSO.
 
 ## Install
 
@@ -56,28 +63,28 @@ skills directory.
 
 ```
 llm-wiki/
-├── SKILL.md              # skill instructions (~12 KB, minimal)
+├── SKILL.md              # skill instructions (~4 KB, minimal)
 ├── references/
-│   ├── page.template.md      # wiki page frontmatter
 │   ├── source.template.md    # raw source copy template
 │   ├── SCHEMA.template.md    # per-project schema skeleton
+│   ├── quality.md            # depth rules per page type
 │   ├── pi-session-recipe.md  # Pi JSONL fork detection + extraction
 │   └── agent-session-recipe.md  # Claude Code, opencode, Gemini CLI
+└── skills/
+    └── ingest-web-chat/      # CDP-driven web chat ingestion
 ```
 
 ## What's in SKILL.md
 
-- **Page types** — 7 canonical types with definitions (`concept`, `decision`,
-  `bug`, `bugfix`, `open-question`, `source`, `reference`, `synthesis`)
-- **Page quality heuristics** — minimum depth per type (tables, code blocks,
-  paragraphs) so pages don't stay stubs
-- **Query filing** — syntheses that combine ≥2 pages get offered as
+- **Page types** — 7 canonical types (`concept`, `decision`, `bug`,
+  `open-question`, `source`, `reference`, `synthesis`)
+- **Page quality heuristics** — minimum depth per type so pages don't
+  stay stubs (lazy-loaded from `references/quality.md`)
+- **Query filing** — syntheses that connect ≥2 pages get offered as
   `type: synthesis` so good answers don't disappear into chat history
-- **Contradiction detection** — grep antonym pairs, flag with
-  `⚠️ CONTRADICTION:` format
 - **Lint rules** — deterministic fixes (broken links, orphans, type
   consistency) + heuristic reports (stale claims, thin pages, concept gaps)
-- **Schema co-evolution** — 5 triggers that prompt SCHEMA.md updates
+- **Schema co-evolution** — triggers that prompt SCHEMA.md updates
 
 ## Session recipes (lazy-loaded)
 
@@ -92,15 +99,32 @@ limits, tool artifacts), branch-by-branch reading.
 JSON, opencode SQLite (dual schema variants). Inventory, triage, extraction
 patterns. One-line table for quick tool→location mapping.
 
-## Notable other implementations
+## Related work
 
-- [Astro-Han/karpathy-llm-wiki](https://github.com/Astro-Han/karpathy-llm-wiki) — pure skill, most established (~638 stars)
-- [praneybehl/llm-wiki-plugin](https://github.com/praneybehl/llm-wiki-plugin) — Claude Code plugin with slash commands, BM25 search, graph layer
-- [iRonin/pi-llm-wiki](https://github.com/iRonin/pi-llm-wiki) — Pi-native package with extension guardrails and generated metadata
+Other implementations of Karpathy's LLM Wiki pattern, each with different
+trade-offs:
 
-This skill stays lighter — no extension dependency, no JSON metadata,
-no search engine required at small scale. The trade-off is convention
-over enforcement.
+- **[Astro-Han/karpathy-llm-wiki](https://github.com/Astro-Han/karpathy-llm-wiki)**
+  — the most widely used pure-markdown skill. Agent Skills-compatible
+  for Claude Code, Cursor, and Codex. Good starting point if you want
+  a single-file skill without session recipes.
+- **[lewislulu/llm-wiki-skill](https://github.com/lewislulu/llm-wiki-skill)**
+  — skill plus Obsidian plugin, web viewer, and audit plugin. Heavier
+  but richer ecosystem if you live in Obsidian.
+- **[Pratiyush/llm-wiki](https://github.com/Pratiyush/llm-wiki)** — a
+  Python CLI tool (`llmwiki`) that ingests sessions and generates a
+  static site. Stdlib-only, exports `llms.txt` / `llms-full.txt`.
+  Different shape (tool vs skill) but same pattern.
+- **[toolboxmd/karpathy-wiki](https://github.com/toolboxmd/karpathy-wiki)**
+  — two Claude Code skills (setup + maintain). Hooks-driven, simple.
+- **[Kausik-A/pi-llm-wiki](https://github.com/Kausik-A/pi-llm-wiki)** /
+  **[iRonin/pi-llm-wiki](https://github.com/iRonin/pi-llm-wiki)** —
+  Pi-native packages with a bundled skill *and* a Pi extension for
+  deterministic operations, guardrails, and generated metadata.
+  Convention vs enforcement trade-off: they enforce via code; this
+  skill enforces via convention.
+- **[yologdev/karpathy-llm-wiki](https://github.com/yologdev/karpathy-llm-wiki)**
+  — self-growing wiki via AI agent "yoyo". Includes a web viewer.
 
 ## License
 

@@ -11,7 +11,7 @@ export interface RawTurn {
 }
 
 export interface RawChat {
-  provider: "claude";
+  provider: string;
   title: string;
   url: string;
   conv_id: string;

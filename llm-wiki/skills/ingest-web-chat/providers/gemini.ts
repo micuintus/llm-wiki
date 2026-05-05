@@ -5,7 +5,7 @@
 //   </share-turn-viewer>
 // Each turn-viewer holds one user query plus one model response.
 import type { Page } from "rebrowser-playwright-core";
-import type { RawChat, RawTurn } from "./claude.ts";
+import type { RawChat } from "./claude.ts";
 
 export const GEMINI_HOSTS = ["gemini.google.com"];
 
@@ -53,10 +53,10 @@ export async function extractGemini(page: Page, url: string): Promise<RawChat> {
 
   const convId = url.split("/").pop()?.split("?")[0] ?? "unknown";
   return {
-    provider: "gemini" as unknown as "claude",
+    provider: "gemini",
     title: data.title || "Gemini chat",
     url,
     conv_id: convId,
-    turns: data.turns as RawTurn[],
+    turns: data.turns,
   };
 }

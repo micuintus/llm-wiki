@@ -29,7 +29,7 @@ By subject, not by kind. New topics need user approval.
 
 ## Page types
 
-- `concept`, `entity`, `source`, `synthesis`, `archive` — see SKILL.md.
+- `concept`, `decision`, `bug`, `open-question`, `source`, `reference`, `synthesis` — see SKILL.md.
 
 ## Lint rules
 

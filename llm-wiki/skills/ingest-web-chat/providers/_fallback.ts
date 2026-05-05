@@ -1,5 +1,5 @@
-// Generic fallback: run Defuddle in-page on the rendered DOM.
-// Used for providers without a dedicated extractor (e.g. Le Chat, Gemini until selectors land).
+// Generic fallback for providers without a dedicated extractor.
+// Returns one bulk "assistant" turn with the full page HTML — no turn segmentation.
 import type { Page } from "rebrowser-playwright-core";
 import type { RawChat } from "./claude.ts";
 
@@ -18,7 +18,7 @@ export async function extractFallback(
   // No turn segmentation in fallback — single "assistant" turn carrying the whole rendered HTML.
   // The user can re-run with a real provider extractor once one exists.
   return {
-    provider: provider as "claude",
+    provider,
     title: title.trim(),
     url,
     conv_id: convId,
