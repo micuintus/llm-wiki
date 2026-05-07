@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] — 2026-05-07
+
+### Added
+- **Tagline:** "As minimal as Pi." Added to README subtitle and package.json description.
+- **Pi GitHub install:** `pi install github:micuintus/llm-wiki` alongside existing npm install.
+
+### Changed
+- **README** — Restructured Install section with three explicit paths: Pi (npm), Pi (GitHub), everyone else (curl).
+- **package.json keywords** — Added `"minimal"`.
+
 ## [1.4.0] — 2026-05-07
 
 ### Added

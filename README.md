@@ -1,5 +1,7 @@
 # @micuintus/llm-wiki
 
+> As minimal as Pi.
+
 Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) as a skill. One file. ~6 KB. No dependencies, no CLI, no web server, no Obsidian plugin.
 
 The user curates sources. The LLM does the bookkeeping — summarizing,
@@ -8,12 +10,17 @@ being re-derived from raw chunks on every query.
 
 ## Install
 
-Pi:
+**Pi (npm):**
 ```bash
 pi install npm:@micuintus/llm-wiki
 ```
 
-Everyone else:
+**Pi (GitHub):**
+```bash
+pi install github:micuintus/llm-wiki
+```
+
+**Everyone else:**
 ```bash
 # Copy one file. Start ingesting.
 curl -L https://raw.githubusercontent.com/micuintus/llm-wiki/main/llm-wiki/SKILL.md \
