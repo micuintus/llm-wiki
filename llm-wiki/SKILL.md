@@ -66,11 +66,18 @@ in `log.md` so wiki state is transparent.
 
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,
-`synthesis`. Depth rules per type — plus useful `concept` variants
-(comparison matrix, implementation walkthrough): `references/quality.md`.
+`synthesis`, `stub`. Use `stub` for sources that are registered but not
+yet compiled — lint can find these. Depth rules per type — plus useful
+`concept` variants (comparison matrix, implementation walkthrough):
+`references/quality.md`.
 
 Optional but recommended: `tags: [tag1, tag2]` — enables grep-based
 discovery when the wiki grows beyond ~20 pages.
+
+For sources whose claims are inconsistent or partially fabricated
+(common for LLM chat exports), add `reliability: high|mixed|unverified`
+to the source entry's frontmatter and annotate per-claim attribution
+in compiled pages. See `references/quality.md` for the pattern.
 
 ### Special sources
 
@@ -88,6 +95,21 @@ Read `index.md`, follow links, synthesize with citations. Prefer wiki
 over training; say so if coverage is missing. If the answer connects
 ≥2 pages, offer to file as `type: synthesis`.
 
+### Archive on request
+
+When the user explicitly asks to file/save/archive a query answer:
+
+1. Always create a **new** page with `type: synthesis` (or `archive`
+   for point-in-time snapshots that should never cascade-update).
+   Never merge synthesised answers into existing concept pages —
+   that conflates source-derived knowledge with derived knowledge.
+2. Place it in the most relevant topic directory; name after the
+   query topic, not the conversation.
+3. `sources:` lists the wiki pages cited (not raw sources directly).
+4. In `index.md`, prefix the summary with `[Synthesis]` or
+   `[Archive]` so readers know it's derived rather than primary.
+5. Log as `## [YYYY-MM-DD] archive | <page title>`.
+
 ## Correction pattern
 
 When initial analysis was wrong, document the correction explicitly
@@ -104,14 +126,44 @@ value of the mistake.
 
 ## Lint
 
-Auto-fix: index↔filesystem sync, broken links, See Also
-bidirectionality, type validity. Report (don't fix): contradictions,
-stale claims, orphans, concept gaps. Append findings to `log.md`.
+Two categories with different authority levels.
 
-Relative path verification: for every `](path.md)` link, verify the
-file exists at that relative path. Common errors: same-dir links
-written as `../dir/file.md`, sibling links written as `dir/file.md`
-(looks for subdir, not sibling).
+### Deterministic (auto-fix)
+
+- **Index ↔ filesystem sync.** File present but missing from `index.md`
+  → add entry with `(no summary)` placeholder. Index entry pointing to
+  nonexistent file → mark `[MISSING]`; do not delete.
+- **Internal links.** For every `](path.md)` link in compiled pages,
+  verify the target exists at that relative path. Common errors:
+  same-dir links written as `../dir/file.md`; sibling links written as
+  `dir/file.md` (looks for subdir, not sibling). If exactly one file
+  with the same basename exists elsewhere, fix the path; otherwise
+  report.
+- **Raw-source references.** Every link from a compiled page into
+  `raw-sources/` must resolve. Same fix-or-report rule.
+- **See Also bidirectionality.** If A links to B in See Also, B should
+  link back. Add the missing direction.
+- **Frontmatter type validity.** Reject types not in the canonical list.
+- **Stub aging.** `type: stub` pages older than 30 days → flag in log.
+
+### Heuristic (report only)
+
+- Contradictions across pages without attribution.
+- Stale claims superseded by newer sources.
+- Orphan pages (no inbound links).
+- Concepts mentioned ≥3× across the wiki but lacking a dedicated page.
+- Sources with `reliability: mixed|unverified` whose claims appear in
+  compiled pages without per-claim attribution.
+- Archive pages whose cited sources have been substantially updated.
+
+### Post-lint
+
+Append to `log.md`:
+
+```
+## [YYYY-MM-DD] lint | <N> issues, <M> auto-fixed
+- <issue or fix summary>
+```
 
 ## Schema
 

@@ -146,8 +146,11 @@ async function writeIntoWiki(
   if (existsSync(indexPath)) {
     const cur = await readFile(indexPath, "utf8");
     if (!cur.includes(filename)) {
-      const updated = cur.includes("## Conversations")
-        ? cur.replace(/(## Conversations\n)/, `$1${entry}`)
+      // Match existing section header case-insensitively to honor whatever
+      // casing the wiki already uses (e.g. "## conversations" vs "## Conversations").
+      const sectionMatch = cur.match(/^(##\s+conversations\s*)$/im);
+      const updated = sectionMatch
+        ? cur.replace(sectionMatch[0], `${sectionMatch[0]}\n${entry}`.replace(/\n\n+/g, "\n"))
         : cur.trimEnd() + `\n\n## Conversations\n${entry}`;
       await writeFile(indexPath, updated, "utf8");
     }

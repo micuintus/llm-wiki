@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] — 2026-05-07
+
+### Added
+- **`type: stub`** for registered-but-not-compiled sources and forward-reference placeholders. Lint flags stubs older than 30 days. Depth rule: frontmatter + one-paragraph rationale + link to raw source.
+- **Source reliability protocol.** New `reliability: high|mixed|unverified` field for sources, with documented per-claim attribution pattern in `quality.md` for compiling from `mixed`/`unverified` material (typical of LLM chat exports). Lint flags `mixed`/`unverified` sources cited in compiled pages without a `## Source reliability` section.
+- **Archive-on-request workflow** in Query section. Explicit rule: synthesised answers always become new pages (never merged into existing concept pages); index summary prefixed `[Synthesis]` or `[Archive]`; logged as `archive` verb.
+
+### Changed
+- **Lint rewritten with deterministic / heuristic split.** Auto-fix list (index-FS sync, internal links, raw refs, See Also bidirectionality, frontmatter validity, stub aging) separated from report-only list (contradictions, stale claims, orphans, concept gaps, unattributed mixed-source claims, archive-page drift). Sharper authority boundary; modeled after Astro-Han/karpathy-llm-wiki's lint structure.
+
+### Fixed
+- **`ingest-web-chat`: `## Conversations` casing bug.** Section header detection was case-sensitive and would write a duplicate capital-C section if the existing wiki used lowercase. Now case-insensitive match preserves whatever casing the wiki already uses.
+
+
 ## [1.2.3] — 2026-05-07
 
 ### Changed
