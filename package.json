@@ -1,13 +1,14 @@
 {
   "name": "@micuintus/llm-wiki",
-  "version": "1.4.0",
-  "description": "Karpathy's LLM Wiki pattern as a minimal, agent-agnostic skill for Pi",
+  "version": "1.4.1",
+  "description": "As minimal as Pi. Karpathy's LLM Wiki pattern as a minimal, agent-agnostic skill.",
   "keywords": [
     "pi-package",
     "llm-wiki",
     "karpathy",
     "knowledge-base",
-    "second-brain"
+    "second-brain",
+    "minimal"
   ],
   "homepage": "https://github.com/micuintus/llm-wiki",
   "bugs": {
