@@ -42,6 +42,9 @@ for when the source is a repository rather than prose.
 **Web chat ingestion** — Claude.ai, ChatGPT, Gemini, Le Chat via CDP.
 Ships as a separate subskill (`skills/ingest-web-chat/`).
 
+> The lazy-loaded subskills sleep forever until you wake them. (Don't
+> forget to kiss these sleeping beauties.)
+
 ## Use cases
 
 - **Reading a book** — chapter summaries, character/concept pages, theme threads, all interlinked.
