@@ -30,11 +30,16 @@ By subject, not by kind. New topics need user approval.
 ## Page types
 
 - `concept`, `decision`, `bug`, `open-question`, `source`, `reference`, `synthesis` — see SKILL.md.
+- `taxonomy` — Categorized enumeration with comparison matrix (e.g., mechanism taxonomy, primitive mapping).
+- `implementation` — Concrete code implementation with architecture diagram and design decisions.
 
 ## Lint rules
 
 - Stale-claim threshold: 30 days.
 - Required tags: list canonical set if used.
+- Relative path verification: every `](*.md)` link must resolve from the file's directory.
+- Bidirectional links: if page A links to page B, page B must link back.
+- Tag presence: warn if `tags:` is missing on pages >100 lines.
 
 ## Notes
 

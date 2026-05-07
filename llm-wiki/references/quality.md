@@ -13,9 +13,11 @@ Lazy-loaded. Read when finishing a page or running lint.
 | `source` | metadata + key content + reliability — can be terse |
 | `reference` | lookup table or command list — can be terse |
 | `synthesis` | cites ≥2 wiki pages, adds new connection or conclusion |
+| `taxonomy` | ≥1 large comparison table, ≥1 contender matrix, cites ≥10 sources |
+| `implementation` | ≥1 architecture diagram, ≥1 code block with actual implementation, design decisions table |
 
 Stubs (frontmatter + one paragraph + See Also) are acceptable for
-`source` and `reference`, not for `concept`, `decision`, or `bug`.
+`source` and `reference`, not for `concept`, `decision`, `bug`, `taxonomy`, or `implementation`.
 
 ## Done checklist
 

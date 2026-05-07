@@ -64,7 +64,11 @@ in `log.md` so wiki state is transparent.
 
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,
-`synthesis`. Depth rules per type: `references/quality.md`.
+`synthesis`, `taxonomy`, `implementation`. Depth rules per type:
+`references/quality.md`.
+
+Optional but recommended: `tags: [tag1, tag2]` — enables grep-based
+discovery when the wiki grows beyond ~20 pages.
 
 ### Special sources
 
@@ -82,11 +86,35 @@ Read `index.md`, follow links, synthesize with citations. Prefer wiki
 over training; say so if coverage is missing. If the answer connects
 ≥2 pages, offer to file as `type: synthesis`.
 
+## Correction pattern
+
+When initial analysis was wrong, document the correction explicitly
+rather than silently rewriting:
+
+```markdown
+### Correction: [what was wrong]
+[Original claim] was incorrect because [reason].
+The accurate picture is [correction].
+```
+
+This preserves the learning arc. Silent rewrites lose the pedagogical
+value of the mistake.
+
+## Cross-wiki links
+
+Sibling project wikis at the same repo level: `../../../../sibling/llm-wiki/page.md`.
+Always verify by counting directory levels from the file to repo root.
+
 ## Lint
 
 Auto-fix: index↔filesystem sync, broken links, See Also
 bidirectionality, type validity. Report (don't fix): contradictions,
 stale claims, orphans, concept gaps. Append findings to `log.md`.
+
+Relative path verification: for every `](path.md)` link, verify the
+file exists at that relative path. Common errors: same-dir links
+written as `../dir/file.md`, sibling links written as `dir/file.md`
+(looks for subdir, not sibling).
 
 ## Schema
 
