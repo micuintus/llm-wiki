@@ -1,6 +1,6 @@
 # @micuintus/llm-wiki
 
-Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) as a skill. One file. ~4 KB. No dependencies, no CLI, no web server, no Obsidian plugin.
+Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) as a skill. One file. ~6 KB. No dependencies, no CLI, no web server, no Obsidian plugin.
 
 The user curates sources. The LLM does the bookkeeping — summarizing,
 cross-linking, flagging contradictions. Knowledge compounds instead of
@@ -28,6 +28,9 @@ path in the skill text, never loaded until you actually need it.
 **Agent session recipes (lazy-loaded):**
 - **Pi sessions** — JSONL trees with fork detection
 - **Claude Code / opencode / Gemini CLI** — transcripts, SQLite, JSON
+
+**Code-source recipe** (lazy-loaded) — grep+cite-by-line conventions
+for when the source is a repository rather than prose.
 
 **Web chat ingestion** — Claude.ai, ChatGPT, Gemini, Le Chat via CDP.
 Ships as a separate subskill (`skills/ingest-web-chat/`).
@@ -58,7 +61,7 @@ wiki → schema); they differ in **shape** (how the agent consumes the
 pattern) and **weight** (how much tooling ships alongside the skill).
 
 **What makes `@micuintus/llm-wiki` different:** it is a **pure skill**
-— a single `SKILL.md` (~4 KB) plus lazy-loaded reference files that
+— a single `SKILL.md` (~6 KB) plus lazy-loaded reference files that
 any agent (Pi, Claude Code, Codex, Cursor) can read directly. No
 runtime dependencies, no generated code, no CLI to install, no web
 server to run, no Obsidian plugin to manage. Conventions are enforced

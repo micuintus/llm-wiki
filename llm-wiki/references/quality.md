@@ -80,3 +80,26 @@ Before marking a page done, verify:
 - See Also: bidirectional links to related pages
 - Index: page appears in `index.md` with one-line summary
 - For `mixed`/`unverified` sources: `## Source reliability` section present
+
+## Source-size heuristic
+
+A useful starting point when compiling: **one compiled page per
+~1000 lines of source, per cohesive subsystem.** Under-mining is the
+more common failure than over-mining. If a 3,000-line reference
+manual has produced one summary page, you've likely left value on
+the table — re-read for missed sections.
+
+## Correction pattern
+
+When initial analysis was wrong, document the correction explicitly
+rather than silently rewriting:
+
+```markdown
+### Correction: [what was wrong]
+[Original claim] was incorrect because [reason].
+The accurate picture is [correction].
+```
+
+This preserves the learning arc. Silent rewrites lose the
+pedagogical value of the mistake — and break audit trails when
+someone (you, later) wonders why the page changed.
