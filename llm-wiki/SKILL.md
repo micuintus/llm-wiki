@@ -31,19 +31,36 @@ propose schema values before the first ingest.
 
 ## Ingest
 
-1. **Register.** Stable URL/path → reference in `raw-sources/index.md`.
-   Ad-hoc/pasted → copy to `raw-sources/<bucket>/YYYY-MM-DD-slug.md`
-   (see `references/source.template.md`). New bucket needs user
-   approval + SCHEMA update.
+Ingest = **register** + **compile** + **log**. Use these verbs precisely
+in `log.md` so wiki state is transparent.
 
-2. **Compile.** Each distinct thesis becomes or updates a page in
-   `<topic>/`. Merge with `str_replace` (don't rewrite); append to
-   `sources:`; bump `updated:`. Cascade to other affected pages.
+1. **Register.** List the source in `raw-sources/index.md` with a
+   stable identifier. If the source is mutable or auth-walled
+   (e.g. Google Doc, Confluence), copy it into
+   `raw-sources/<bucket>/YYYY-MM-DD-slug.md` (see
+   `references/source.template.md`). If the source is already stable
+   (in-repo path, public URL), reference it by path/URL without copying.
+   New bucket needs user approval + SCHEMA update.
+
+   `raw-sources/index.md` format: one section per bucket. Each entry is
+   a table row with `path | slug | topics`. Keep it terse — this is a
+   registry, not a summary.
+
+   HTML documentation sites (Sphinx, Doxygen, ReadTheDocs) and auth-
+   walled sources (Confluence, Google Docs) may require extraction or
+   credentials. Redact credentials from any copied material.
+
+2. **Compile.** Distill the source into pages in `<topic>/`. Merge with
+   `str_replace` (don't rewrite); append to `sources:`; bump `updated:`.
+   Cascade to other affected pages. Forward references to pages not yet
+   compiled are acceptable — they self-resolve as the wiki grows.
    Annotate conflicts inline with attribution. Archive pages
    (`type: synthesis`/`archive`) are never cascade-updated.
 
 3. **Log.** Update `index.md`; append to `log.md`:
    `## [YYYY-MM-DD] ingest | <title>` + `- Updated: <page>` per cascade.
+   If only register happened (no compile yet), log as
+   `## [YYYY-MM-DD] register | <title>` and note "compile pending".
 
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,

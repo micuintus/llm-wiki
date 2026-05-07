@@ -101,30 +101,70 @@ patterns. One-line table for quick tool→location mapping.
 
 ## Related work
 
-Other implementations of Karpathy's LLM Wiki pattern, each with different
-trade-offs:
+The Karpathy gist has spawned a diverse ecosystem. Implementations
+fall into four shapes: **skills** (agent reads a markdown file),
+**skill + ecosystem** (skill plus companion tools), **CLI tools**
+(standalone programs), and **self-growing** (agent-driven automation).
 
-- **[Astro-Han/karpathy-llm-wiki](https://github.com/Astro-Han/karpathy-llm-wiki)**
-  — the most widely used pure-markdown skill. Agent Skills-compatible
-  for Claude Code, Cursor, and Codex. Good starting point if you want
-  a single-file skill without session recipes.
-- **[lewislulu/llm-wiki-skill](https://github.com/lewislulu/llm-wiki-skill)**
-  — skill plus Obsidian plugin, web viewer, and audit plugin. Heavier
-  but richer ecosystem if you live in Obsidian.
-- **[Pratiyush/llm-wiki](https://github.com/Pratiyush/llm-wiki)** — a
-  Python CLI tool (`llmwiki`) that ingests sessions and generates a
-  static site. Stdlib-only, exports `llms.txt` / `llms-full.txt`.
-  Different shape (tool vs skill) but same pattern.
-- **[toolboxmd/karpathy-wiki](https://github.com/toolboxmd/karpathy-wiki)**
-  — two Claude Code skills (setup + maintain). Hooks-driven, simple.
-- **[Kausik-A/pi-llm-wiki](https://github.com/Kausik-A/pi-llm-wiki)** /
-  **[iRonin/pi-llm-wiki](https://github.com/iRonin/pi-llm-wiki)** —
-  Pi-native packages with a bundled skill *and* a Pi extension for
-  deterministic operations, guardrails, and generated metadata.
-  Convention vs enforcement trade-off: they enforce via code; this
-  skill enforces via convention.
-- **[yologdev/karpathy-llm-wiki](https://github.com/yologdev/karpathy-llm-wiki)**
-  — self-growing wiki via AI agent "yoyo". Includes a web viewer.
+### Skills — agent reads SKILL.md, no runtime code
+
+| Repo | Stars | Contrib | License | Lang | Notes |
+|------|-------|---------|---------|------|-------|
+| [Astro-Han/karpathy-llm-wiki](https://github.com/Astro-Han/karpathy-llm-wiki) | 651 | 1 | MIT | Markdown | Agent Skills-compatible for Claude Code, Cursor, Codex. Single-file SKILL.md, no session recipes. Closest to a vanilla skill. |
+| [toolboxmd/karpathy-wiki](https://github.com/toolboxmd/karpathy-wiki) | 66 | 1 | — | Shell | Two Claude Code skills: one for setup, one for maintenance. Hooks-driven. |
+| [balukosuri/llm-wiki-karpathy](https://github.com/balukosuri/llm-wiki-karpathy) | 125 | 1 | — | — | Article + implementation walkthrough. |
+
+### Skill + ecosystem — skill plus companion tools
+
+| Repo | Stars | Contrib | License | Lang | Notes |
+|------|-------|---------|---------|------|-------|
+| [lewislulu/llm-wiki-skill](https://github.com/lewislulu/llm-wiki-skill) | 447 | 2 | MIT | TypeScript | Skill + Obsidian audit plugin + local web viewer + shared TypeScript audit library. For users who want IDE-like tooling around the wiki. |
+
+### CLI tools — standalone programs
+
+| Repo | Stars | Contrib | License | Lang | Notes |
+|------|-------|---------|---------|------|-------|
+| [lucasastorian/llmwiki](https://github.com/lucasastorian/llmwiki) | 808 | — | Apache-2.0 | Python + TypeScript | Upload documents, connect Claude via MCP, agent writes the wiki. MCP-native. |
+| [Pratiyush/llm-wiki](https://github.com/Pratiyush/llm-wiki) | 229 | 1 | MIT | Python | `llmwiki` CLI: session ingestion, static site generation, 2,651 tests, 16 lint rules, MCP server, Playwright E2E, AI exports (`llms.txt`, JSON-LD, RSS). Most feature-rich; heaviest. Stdlib-first runtime. |
+
+### Pi-native — code enforcement, not just convention
+
+| Repo | Stars | Contrib | License | Lang | Notes |
+|------|-------|---------|---------|------|-------|
+| [Kausik-A/pi-llm-wiki](https://github.com/Kausik-A/pi-llm-wiki) | 9 | 1 | MIT | TypeScript | Pi package with bundled skill + Pi extension. Enforces guardrails via code rather than convention. [iRonin/pi-llm-wiki](https://github.com/iRonin/pi-llm-wiki) is a fork with additional changes. |
+
+### Self-growing — agent-driven automation
+
+| Repo | Stars | Contrib | License | Lang | Notes |
+|------|-------|---------|---------|------|-------|
+| [yologdev/karpathy-llm-wiki](https://github.com/yologdev/karpathy-llm-wiki) | 43 | 2 | — | TypeScript | "Yoyo" AI agent grows the wiki from Karpathy's founding prompt. Commits are the agent's work. Includes web viewer. |
+| [hsuanguo/llm-wiki](https://github.com/hsuanguo/llm-wiki) | 11 | 2 | MIT | Python | Two-part repo: wiki that "evolves with you" + Python scaffolding. |
+
+### How to choose
+
+- **Want a single markdown file you paste into any agent?** → A skill
+  (Astro-Han, toolboxmd, or this repo).
+- **Want IDE integration (Obsidian, web viewer, audit)?** → lewislulu's
+  ecosystem.
+- **Want a program that runs in your shell and generates a site?** →
+  Pratiyush's CLI or lucasastorian's MCP tool.
+- **Want the agent to enforce rules via code, not just convention?** →
+  Kausik-A's Pi extension.
+- **Want the wiki to grow itself with minimal human input?** →
+  yologdev's self-growing approach.
+
+All share the same Karpathy foundation: raw sources → compiled wiki →
+schema, with the LLM doing the bookkeeping.
+
+## Changelog
+
+### 1.1.5
+
+- Ingest vocabulary tightened: `register` vs `compile` vs `ingest` with
+  log conventions.
+- `raw-sources/index.md` format specified (`path | slug | topics`).
+- Forward references to uncompiled pages explicitly allowed.
+- HTML docs and auth-walled sources acknowledged in Register step.
 
 ## License
 
