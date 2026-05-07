@@ -66,21 +66,15 @@ in `log.md` so wiki state is transparent.
 
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,
-`synthesis`, `stub`. Use `stub` for sources that are registered but not
-yet compiled — lint can find these. Depth rules per type — plus useful
-`concept` variants (comparison matrix, implementation walkthrough):
-`references/quality.md`.
-
-Optional but recommended: `tags: [tag1, tag2]` — enables grep-based
-discovery when the wiki grows beyond ~20 pages.
-
-For sources whose claims are inconsistent or partially fabricated
-(common for LLM chat exports), add `reliability: high|mixed|unverified`
-to the source entry's frontmatter and annotate per-claim attribution
-in compiled pages. See `references/quality.md` for the pattern.
+`synthesis`, `stub`. Use `stub` for sources registered but not yet
+compiled. Optional: `tags: [tag1, tag2]` for grep-based discovery on
+wikis >20 pages. Depth rules per type — plus `concept` variants and
+the correction pattern — in `references/quality.md`.
 
 ### Special sources
 
+- **Code repositories / source trees** — different shape from prose.
+  See `references/code-source-recipe.md`.
 - **Agent sessions** — Pi (JSONL trees with forks): see
   `references/pi-session-recipe.md`. Claude Code, Gemini CLI, opencode:
   see `references/agent-session-recipe.md`. Lazy-load.
@@ -88,6 +82,13 @@ in compiled pages. See `references/quality.md` for the pattern.
   enterprise-SSO-safe).
 - **Binaries** (figures, audio, checkpoints) — bucket per kind, always
   pair with a companion `.md`; cite the `.md`, not the binary.
+- **PDFs** — extract to text first (`pdftotext -layout` or equivalent),
+  register the extracted text path, not the PDF.
+
+For sources whose claims are inconsistent or partially fabricated
+(common for LLM chat exports), add `reliability: high|mixed|unverified`
+to the source entry's frontmatter and annotate per-claim attribution
+in compiled pages. See `references/quality.md` for the pattern.
 
 ## Query
 
@@ -95,34 +96,10 @@ Read `index.md`, follow links, synthesize with citations. Prefer wiki
 over training; say so if coverage is missing. If the answer connects
 ≥2 pages, offer to file as `type: synthesis`.
 
-### Archive on request
-
-When the user explicitly asks to file/save/archive a query answer:
-
-1. Always create a **new** page with `type: synthesis` (or `archive`
-   for point-in-time snapshots that should never cascade-update).
-   Never merge synthesised answers into existing concept pages —
-   that conflates source-derived knowledge with derived knowledge.
-2. Place it in the most relevant topic directory; name after the
-   query topic, not the conversation.
-3. `sources:` lists the wiki pages cited (not raw sources directly).
-4. In `index.md`, prefix the summary with `[Synthesis]` or
-   `[Archive]` so readers know it's derived rather than primary.
-5. Log as `## [YYYY-MM-DD] archive | <page title>`.
-
-## Correction pattern
-
-When initial analysis was wrong, document the correction explicitly
-rather than silently rewriting:
-
-```markdown
-### Correction: [what was wrong]
-[Original claim] was incorrect because [reason].
-The accurate picture is [correction].
-```
-
-This preserves the learning arc. Silent rewrites lose the pedagogical
-value of the mistake.
+When the user explicitly asks to file/save/archive a query answer,
+or to document a correction to prior analysis, see
+`references/synthesis-and-archive.md` (also covers the
+`### Correction:` pattern in `references/quality.md`).
 
 ## Lint
 

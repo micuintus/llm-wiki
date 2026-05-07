@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0] — 2026-05-07
+
+### Added
+- **`references/code-source-recipe.md`** — lazy-loaded recipe for ingesting code repositories: register-by-path (don't copy), grep-driven inventory, `path:line` citations, source-size heuristic (~1 page per ~1000 lines per cohesive subsystem), commit-SHA recording. Closes a gap exposed by real-world stress testing on a 6,400-line C++ engine source.
+- **`references/synthesis-and-archive.md`** — lazy-loaded recipe for filing query answers: synthesis vs. archive distinction, when each cascade-updates, decision rule ("if value disappears with citation changes, it's synthesis; else archive").
+- **PDF guidance** in SKILL.md Special sources: extract to text first, register the extracted text path.
+- **Source-size heuristic** in `quality.md`: ~1 page per ~1000 lines is a useful starting point; under-mining is the common failure.
+
+### Changed
+- **SKILL.md trimmed** 6,957 → 6,260 bytes by lazy-loading the archive-on-request workflow and the correction pattern. Both are now one-line pointers in the Query section.
+- **README byte claim** corrected: "~4 KB" → "~6 KB". The previous figure was stale since 1.2.x growth.
+- **Special sources section** in SKILL.md reorganized: code repositories first (most common case), then sessions, web-chat, binaries, PDFs. Reliability paragraph moved into the same section.
+
+### Why
+Review after a 49-page real-world ingest (Kontakt knowledge base) found three gaps: code-as-source had no recipe, the README's byte claim was stale, and two SKILL.md subsections (archive workflow, correction pattern) were content that earned their place but didn't earn always-loaded bytes.
+
 ## [1.3.0] — 2026-05-07
 
 ### Added
