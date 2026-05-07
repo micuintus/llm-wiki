@@ -2,9 +2,11 @@
 name: llm-wiki
 description: |
   Karpathy's LLM Wiki: LLM-curated personal knowledge base. Trigger on
-  "ingest into the wiki", "what does the wiki say about X", "lint the
-  wiki", or any accumulation of material that should compound rather
-  than scatter.
+  "add to wiki", "save this", "file this", "remember this", "ingest this
+  paper/article/chat/video", "what do I know about X", "what's in the
+  wiki about X", "lint/audit the wiki", or any mention of "LLM wiki",
+  "Karpathy wiki", or "knowledge base" — i.e., any accumulation of
+  material that should compound rather than scatter.
 ---
 
 # LLM Wiki
@@ -64,8 +66,8 @@ in `log.md` so wiki state is transparent.
 
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,
-`synthesis`, `taxonomy`, `implementation`. Depth rules per type:
-`references/quality.md`.
+`synthesis`. Depth rules per type — plus useful `concept` variants
+(comparison matrix, implementation walkthrough): `references/quality.md`.
 
 Optional but recommended: `tags: [tag1, tag2]` — enables grep-based
 discovery when the wiki grows beyond ~20 pages.
@@ -99,11 +101,6 @@ The accurate picture is [correction].
 
 This preserves the learning arc. Silent rewrites lose the pedagogical
 value of the mistake.
-
-## Cross-wiki links
-
-Sibling project wikis at the same repo level: `../../../../sibling/llm-wiki/page.md`.
-Always verify by counting directory levels from the file to repo root.
 
 ## Lint
 

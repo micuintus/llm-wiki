@@ -32,6 +32,13 @@ path in the skill text, never loaded until you actually need it.
 **Web chat ingestion** — Claude.ai, ChatGPT, Gemini, Le Chat via CDP.
 Ships as a separate subskill (`skills/ingest-web-chat/`).
 
+## Use cases
+
+- **Reading a book** — chapter summaries, character/concept pages, theme threads, all interlinked.
+- **Researching a topic across many papers** — concept pages cite multiple sources; contradictions surface instead of getting lost.
+- **Mapping an ecosystem** (e.g., the Pi extension landscape) — taxonomies, comparisons, primitive mappings.
+- **Documenting your own project** — decisions, architecture, bugs, open questions, all linked through one schema.
+
 ## Why this exists
 
 Most wiki implementations ship a CLI, a web server, a static site
@@ -39,8 +46,9 @@ generator, and 2,000 tests. That's fine if you want infrastructure.
 This is for people who want a **pattern** — a convention the agent
 already understands — and nothing else.
 
-Conventions are enforced by the skill text, not by code. If you outgrow
-it, you haven't outgrown anything; the wiki is just markdown on disk.
+Conventions live in the skill text, not in code. The wiki itself is
+plain markdown on disk — if you ever switch agents or skills, your
+data travels with you unchanged.
 
 ## Related work
 

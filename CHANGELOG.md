@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.3] — 2026-05-07
+
+### Changed
+- **Page types collapsed back to Karpathy's 7.** Removed `taxonomy` and `implementation` from the canonical type list; they're now `concept` variants documented in `quality.md` with their own depth rules. Same depth bar, less type proliferation.
+- **Sharpened trigger phrases**: "add to wiki", "save this", "file this", "remember this", "ingest this paper/article/chat/video", "what do I know about X", "knowledge base". Broader and more natural than the old "ingest into the wiki" / "lint the wiki" set.
+- **Session recipes are self-correcting**: added Verification preamble to `pi-session-recipe.md` and `agent-session-recipe.md` instructing the LLM to peek at one session file and confirm the schema before applying. If drifted, adapt the recipe and update the preamble — don't silently work around it.
+
+### Removed
+- **Cross-wiki links section** from SKILL.md. The lint rule "every `](path.md)` must resolve from the file's directory" already covers it; the worked example was just path arithmetic.
+
+### Fixed
+- **Tarball bloat**: nested `.npmignore` excludes `package-lock.json` from the `ingest-web-chat` subskill on publish. Tarball: 59.6kB → 41.7kB.
+
 ## [1.2.0] — 2026-05-07
 
 ### Added

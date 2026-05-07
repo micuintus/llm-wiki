@@ -3,6 +3,11 @@
 How to traverse and ingest Pi agent sessions. Lazy-loaded reference for the
 Sessions step of the LLM Wiki ingest workflow.
 
+> **Verification.** Last confirmed against `@mariozechner/pi-coding-agent`
+> on 2026-05-07. Before applying, `head -n 1` one JSONL file and confirm
+> the event shape still matches. If the schema has drifted, adapt the
+> recipe and update this preamble — don't silently work around it.
+
 ## Directory layout
 
 Pi stores sessions at `~/.pi/agent/sessions/--<encoded-cwd>--/`, where

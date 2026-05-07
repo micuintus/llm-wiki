@@ -3,6 +3,13 @@
 Minimal extraction patterns for Claude Code, Gemini CLI, opencode, and Pi.
 Lazy-loaded: only read this file when actually scanning agent transcripts.
 
+> **Verification.** Last confirmed on 2026-05-07 against current Claude
+> Code, Gemini CLI, and opencode storage layouts. Before applying, peek
+> at one session file (`head` for JSONL/JSON, `sqlite3 .schema` for
+> opencode) and confirm the format still matches. If the schema has
+> drifted, adapt the recipe and update this preamble — don't silently
+> work around it.
+
 ## At a glance
 
 | Tool | Storage | Format | Forks? |

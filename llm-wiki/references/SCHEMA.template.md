@@ -30,8 +30,7 @@ By subject, not by kind. New topics need user approval.
 ## Page types
 
 - `concept`, `decision`, `bug`, `open-question`, `source`, `reference`, `synthesis` — see SKILL.md.
-- `taxonomy` — Categorized enumeration with comparison matrix (e.g., mechanism taxonomy, primitive mapping).
-- `implementation` — Concrete code implementation with architecture diagram and design decisions.
+- Concept variants (taxonomy, implementation walkthrough) — see `quality.md`. Not new types; just shapes a `concept` may take.
 
 ## Lint rules
 
