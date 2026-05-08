@@ -1,0 +1,294 @@
+# Wiki Log
+
+## [2026-05-08] decision+restructure | DACMICU two-variant reframing; drop `@pi-dacmicu/subagent`, depend on Hopsken
+- **Conceptual restructure** (user-driven, after the deep subagent cascade): the wiki had been conflating two unrelated things under "in-session subtask":
+  - Same-session loop via `pi.sendMessage({triggerTurn:true})` — NOT a subagent, just another turn
+  - In-process subagent via `createAgentSession` — a real subagent, just hosted in same node process
+- **Correct framing now codified**:
+  - Subagents are **always context-isolated** (separate `state.messages`). The orthogonal axis "subprocess vs in-process" describes hosting, not context.
+  - DACMICU has **two architectural variants**: Variant A = in-session loop (shared context, same `AgentSession`); Variant B = subagent-per-iteration loop (isolated context, fresh `AgentSession` per iteration).
+  - Both share `@pi-dacmicu/base`'s `agent_end`-driven scheduler; what differs is what runs *inside* each iteration.
+- **Build-vs-reuse decision: DACMICU does NOT ship `@pi-dacmicu/subagent`.** Variant B consumers (`ralph`, `evolve`) depend at runtime on `Hopsken/pi-subagents` (or `tintinweb/pi-subagents` superset) via `pi.events`-based RPC. Avoided rebuilding ~2400 LOC of production-validated code (in-process `createAgentSession`, ConversationViewer modal, agent-tree widget, cross-extension RPC, custom agent loading, themed notifications, worktree isolation, steering, resume).
+- **Coupling**: thin internal `subagent-client/rpc-client.ts` (~80 LOC) wraps Hopsken's `subagents:rpc:spawn` contract. Soft dep — if Hopsken not installed, ralph degrades to Variant A, evolve errors with install instructions.
+- **Updated**:
+  - `dacmicu/concept.md` — added "Two loop variants" section (the load-bearing distinction); added "Subagent build-vs-reuse decision (2026-05-08)" section with full rationale, capability table, coupling shape, fallback; revised umbrella package #6 from `@pi-dacmicu/subagent` to "depend on Hopsken"; struck `key claims` line that privileged Variant A.
+  - `dacmicu/modular-architecture.md` — package table row #3 marked dropped; ralph/evolve hard-deps changed to runtime-soft Hopsken dep; dependency DAG redrawn with dotted arrows for soft dep; layout dir replaced `subagent/` with `subagent-client/` (~80 LOC); primitives table replaced "subagent (subprocess)/(in-process)/(navigability)/(tree)" rows with "subagent-client" + "subagent (provider, reference)" + "subagent (provider, fallback)" rows; ralph/evolve compositions updated; "Defaults for `@pi-dacmicu/subagent`" rewritten as "Subagent integration for DACMICU" describing the Hopsken-dep approach.
+  - `ecosystem/subagents.md` — section "(c) IN-SESSION subtask versions" rewritten as "'In-session subtask' — the term is a category error" with the corrected taxonomy; "Architectural takeaways for `@pi-dacmicu/subagent`" replaced with "Architectural takeaways for DACMICU" capturing the build-vs-reuse decision.
+
+## [2026-05-08] research+update | Deep subagent ecosystem cascade — three architectural patterns identified, in-process variant production-validated
+- Cloned and code-read 5 additional subagent extensions (Hopsken, tintinweb, aleclarson, nicobailon, Jberlinsky/oh-my-pi). Total LOC across surveyed implementations: ~62K.
+- **Three architectural patterns identified** (was previously documented as two):
+  1. Subprocess + `pi --mode json -p --no-session` — in-tree reference, aleclarson, nicobailon
+  2. Subprocess + `pi --mode rpc` — lnilluv only (steerable, ~5× LOC)
+  3. **In-process via `createAgentSession`** — Hopsken, tintinweb. **PRODUCTION-VALIDATED.** Previously documented as "design hypothesis, no in-tree precedent." Wrong.
+- **Key correction**: SDK exports `createAgentSession`, `AgentSession`, `AgentSessionEvent`, `SessionManager`, `SettingsManager` from `@earendil-works/pi-coding-agent` (verified at `dist/index.d.ts:15`). Hopsken's `src/agent-runner.ts:240-345` is the line-precise reference: `createAgentSession({sessionManager: SessionManager.inMemory(cwd), settingsManager, modelRegistry, model, tools, resourceLoader})` then `session.subscribe(event => ...)` then `session.steer()` / `session.abort()`. Zero subprocess overhead, full live event stream. **This is the canonical in-process subagent path; bare `ctx.modelRegistry.stream()` only useful for non-tool-using oracle calls.**
+- **Two flavors of "in-session" subtask**: (a) same-context same-session via `pi.sendMessage({triggerTurn:true, deliverAs:"followUp"})` — DACMICU `attachLoopDriver()` pattern, shared context; (b) same-process, separate `AgentSession` via `createAgentSession` — context isolation but no subprocess. The wiki had been conflating these.
+- **Navigability gap closed by Hopsken**: `ctx.ui.custom(ConversationViewer)` modal with `session.subscribe(() => tui.requestRender())` for live auto-following updates of subagent conversation. ↑↓/PgUp/PgDn/Home/End keys, scroll-up pauses autoscroll, ESC closes. **Closest Pi analog to opencode's Tab-switch.** Combined with `setWidget("agents", factory)` reactive tree (Braille spinners, live tool activity, token counters), this is the gold-standard navigability pattern. **No other surveyed extension has anything comparable.**
+- **Cross-extension RPC pattern** (Hopsken `cross-extension-rpc.ts`): `pi.events.on/emit` with scoped reply channels (`subagents:rpc:spawn`, `:reply:${requestId}`), `PROTOCOL_VERSION` (currently 2), `{success:true, data?:T} | {success:false, error:string}` envelope. Mature pattern worth lifting for FABRIC ↔ subagent integration in `@pi-dacmicu`.
+- **Other ecosystem patterns logged** (not adopted, but documented):
+  - aleclarson `spawn`/`fork` modes — `--no-session` vs `--session <fork-snapshot.jsonl>` for fresh-vs-inherited context
+  - nicobailon true async with `result-watcher.ts`, JSONL artifact writer to disk, per-subagent git worktrees, `agent://<id>` resource scheme implied
+  - tintinweb cron/interval/one-shot scheduling for background subagents (PID-locked persistence)
+  - Jberlinsky/oh-my-pi `agent://<id>` URI as first-class resource (Pi-core fork, not extension)
+- **Updated**:
+  - `ecosystem/subagents.md` — full rewrite from 30-line stub to 200-line deep survey; covers all four research dimensions (architecture / primitives / in-session variants / visibility+navigability) with line-precise citations across all 7 surveyed implementations
+  - `dacmicu/modular-architecture.md` — primitives table extended with `createAgentSession`, `ConversationViewer`, `setWidget` agent-tree, cross-extension RPC; `@pi-dacmicu/subagent` defaults rewritten to make in-process via `createAgentSession` the default and ConversationViewer mandatory; resolved the "in-process variant unverified" open question; package layout updated (`conversation-viewer.ts`, `agent-widget.ts`, `rpc.ts` added).
+
+## [2026-05-08] research+update | Subagent visibility & TODO widget primitives mapped against ecosystem
+- **Q1 — External agent visibility**: surveyed every Pi subprocess invocation mode against in-tree examples and ecosystem extensions. Critical finding: visibility is decided by **the parent invocation site, not the child mode**. Bash tool calling any mode (`--print`, `--mode json`, `--mode rpc`) collapses to text blob. Extension-registered tool with `renderResult` re-rendering events achieves full visibility regardless of which child mode is used. The in-tree canonical reference (`packages/coding-agent/examples/extensions/subagent/index.ts:265`) uses `pi --mode json -p --no-session` for one-shot subagents, NOT `--mode rpc`. RPC is for steerable/multi-turn children (`lnilluv/pi-ralph-loop`, ~1300 LOC vs ~300 LOC for the JSON path). Defaults set for `@pi-dacmicu/subagent`: `spawn_agent` default = JSON mode; `spawn_agent` interactive = RPC mode. FABRIC corollary: must never offer `pi --print -- ...` from bash; the visibility-preserving FABRIC path is the `pi-callback` socket round-trip.
+- **Q2 — TODO widget visibility**: surveyed all six TUI primitives Pi exposes. Found that the production ecosystem uses only a subset: `tmustier/pi-ralph-wiggum` uses `setStatus`; `mitsuhiko/agent-stuff/extensions/loop.ts` and `kostyay` use static `setWidget(key, [...])`; **only `davebcn87/pi-autoresearch` uses the component-factory form of `setWidget`** with reactive `render(width)` + collapsed/expanded states + user-configurable shortcut keys. **Nobody in the ecosystem uses `pi.registerMessageRenderer` for TODO state** — this is the unrealized polish gap closing the distance to Claude Code's `TodoWrite`. Defined the **four-layer widget stack** for `@pi-dacmicu/todo`: L1 per-tool `renderResult` (already in in-tree todo.ts), L2 reactive factory `setWidget` (pi-autoresearch pattern), L3 `registerMessageRenderer` for stream-pinned snapshots (free polish win), L4 modal viewer via `ctx.ui.custom` (already in in-tree todo.ts). The four layers stack cleanly with no conflicts.
+- **Wiki path corrections from a clone of each repo**:
+  - `mitsuhiko/agent-stuff` loop extension is at `extensions/loop.ts`, NOT `pi-extensions/loop.ts` (older citations were wrong; the directory does not exist).
+  - `tmustier/pi-extensions` ralph extension is at `pi-ralph-wiggum/index.ts`, NOT `ralph-wiggum/index.ts`.
+  - In-tree subagent reference uses `--mode json`, NOT `--mode rpc` — wiki text in `subprocess-rpc-rendering.md` and `loop-extensions.md` was conflating the two.
+- **Updated**:
+  - `dacmicu/modular-architecture.md` — verified primitives table now lists 6 widget primitives with exact citations to in-tree and ecosystem references; added "Visibility & widget design — evidence-driven defaults" section codifying the JSON-vs-RPC default for subagent and the four-layer TODO stack
+  - `ecosystem/todo-visualizations.md` — rewrote "polish gap" section into the four-layer stack documentation; added pi-autoresearch's factory pattern with code sample; added `registerMessageRenderer` as the unrealized free win
+  - `ecosystem/loop-extensions.md` — corrected source-path notes (mitsuhiko, tmustier, davebcn87, lnilluv); clarified JSON-vs-RPC distinction for in-tree subagent reference
+  - `architecture/subprocess-rpc-rendering.md` — added TL;DR table at top distinguishing JSON-mode (one-shot, default) from RPC-mode (steerable, ~5× LOC); clarified that visibility is decided by parent invocation site, not child mode
+  - `index.md` — dates refreshed
+
+## [2026-05-08] verify+rewrite | DACMICU modular architecture, primitives verified end-to-end against pi-mono
+- Verified every Pi primitive the DACMICU cluster relies on against pi-mono source. All hooks (`agent_end`, `before_agent_start`, `session_before_compact`, `session_start`, `session_tree`), all methods (`pi.sendMessage({triggerTurn:true, deliverAs:"followUp"})`, `pi.appendEntry`, `pi.registerTool`, `ctx.hasPendingMessages()`, `ctx.signal`, `ctx.sessionManager.getBranch()`), and both subprocess substrates (`pi --mode rpc`, `pi --mode json -p --no-session`) confirmed with line citations. Canonical in-tree reference identified: `examples/extensions/pi-evolve.ts` (510 LOC) exercises the full pattern. The reference subagent example `packages/coding-agent/examples/extensions/subagent/index.ts` confirmed as the visibility-preserving subagent pattern (subprocess + JSON event re-rendering).
+- **Critical new finding**: Pi packages are module-isolated (`docs/packages.md` Dependencies). `peerDependencies` only works for Pi's bundled core (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `@earendil-works/pi-tui`, `typebox`, `@earendil-works/pi-agent-core`). Cross-pi-package code sharing requires `bundledDependencies`, which creates runtime duplication if the bundled extension also runs standalone. Reshapes the modular delivery question: **mono-package with multi-extension `pi.extensions: [...]` is the only strategy with clean code reuse.** Per-package install requires runtime-dedup contract.
+- **Architecture decision**: DACMICU ships as a six-package monorepo (`@pi-dacmicu/{base,todo,subagent,fabric,ralph,evolve}`) with a shared runtime library in `base`. Default delivery is mono-package via `pi install npm:pi-dacmicu` + `pi config` for opt-in per extension. Per-package install is a Strategy (B) variant for power users. The single-extension `pi-dacmicu` plan and the hypothetical `dacmicu_loop` tool with `mode` dispatch are dropped.
+- **TODO depends hard on base**: TODO IS the deterministic outer loop's state machine, not a parallel feature. Without `base`, the loop doesn't exist as designed.
+- **`dacmicu_loop` tool removed from plan**: never implemented anywhere; the actual ecosystem pattern is per-extension custom tools. The shared loop driver lives in base as `attachLoopDriver()`, not as one over-parameterized LLM-facing tool.
+- **Bash + `pi --print` demoted to anti-pattern** in `pi-port.md`. Was framed as Option 1; visibility loss makes it incompatible with DACMICU's UX. Kept only as a brief caveat at the top of the alternatives discussion.
+- **Open verification gaps documented**: in-process subagent via `ctx.modelRegistry.stream()` (no in-tree precedent), per-turn `systemPrompt` injection cost (untested at scale), Unix socket survival across `/reload` (untested), `tool_call` interceptor ordering (undocumented contract), runtime-dedup contract for Strategy (B) (unspecified).
+- **Updated** (pruned outdated content):
+  - `dacmicu/concept.md` — umbrella framing now reflects six packages; preserves four-aspect framing as user-facing concerns
+  - `dacmicu/pi-port.md` — rewritten; bash + `pi --print` is anti-pattern not Option 1; in-session driver is THE port with verified hook table
+  - `dacmicu/implementation-plan.md` — entirely rewritten; from single-extension to build-sequence-across-six-packages; LOC estimates per package; library API sketch for `attachLoopDriver()`
+  - `dacmicu/spirit-vs-opencode.md` — "What to take forward" item 1 updated: uniformity recovered via shared library, not via single tool
+  - `implementations/pi-evolve-extension.md` — repositioned as canonical in-tree reference for the modular architecture
+  - `implementations/pi-callback-extension.md` — repositioned as design for `@pi-dacmicu/fabric` package; independent of the loop primitive
+  - `index.md` — dates and entry summaries refreshed
+- **New**: `dacmicu/modular-architecture.md` — the six-package decision document with primitives verification table, module-isolation finding, dep DAG, three delivery strategies
+
+## [2026-05-07] lint | 8 issues, 8 auto-fixed; pre-existing heuristic findings noted
+- **Auto-fixed** (deterministic):
+  - Wrong-depth MetaHarness cross-wiki paths: `index.md` (`../../` → `../../../`), `concepts/deterministic-agent-control-mechanisms.md` and `ecosystem/evolve-systems.md` (`../../../` → `../../../../`). MetaHarness wiki is at `aiAgentResearch/MetaHarness/llm-wiki/`, not under `pi-mono/`.
+  - `ecosystem/pi-footer-hashline-extensions.md`: bare `index.md` link → `../index.md`.
+  - Invalid frontmatter types: `architecture/pi-print-rpc-vs-oc-check.md` `comparison`→`synthesis`; `dacmicu/pi-port.md`, `comparisons/loop-architectures.md`, `architecture/turn-and-loop-nomenclature.md`, `architecture/loop-internals.md` all `page`→`concept`.
+  - DACMICU cluster `see_also` bidirectionality: added missing `see_also` blocks to `dacmicu/pi-port.md`, `dacmicu/implementation-plan.md`, `implementations/pi-callback-extension.md`, `implementations/pi-evolve-extension.md`, `architecture/pi-print-rpc-vs-oc-check.md`. All 7 cluster pages now mutually link.
+- **Heuristic findings** (not auto-fixed, pre-existing scope outside this work):
+  - Pre-existing `see_also` asymmetries in non-DACMICU clusters: web-search (web-search-extensions ↔ web-search-providers ↔ web-search-provider-strategy ↔ typebox-zod-schema-error ↔ local-pi-setup), hashline (pi-hashline-edit-tools ↔ pi-footer-hashline-extensions ↔ footer-themes), llm-chat-ingestion ↔ skills/llm-wiki. These pages embed `see_also` items as `[Title](path)` markdown links rather than bare paths, which compounds the parser's view of asymmetry. Worth a dedicated cleanup pass.
+  - Index entries for `../../MetaHarness/llm-wiki/index.md` (cross-wiki) and `references/local-pi-setup.md` referenced by `index.md` are intentional/valid — ignored by the linter heuristic.
+- **Final state**: 0 broken internal links, 0 invalid types, 0 aged stubs, 0 DACMICU-cluster bidi violations.
+
+## [2026-05-07] ingest | DACMICU as umbrella, FABRIC vs Ralph, RPC, TUI bash callback
+- Source: in-session pi conversation (Claude) on pi-mono worktree → `raw-sources/conversations/2026-05-07-pi-session-dacmicu-umbrella-fabric-rpc-callback.md` (reliability: high)
+- User reframed DACMICU as **umbrella** unifying: Ralph (in-agent + subagent), FABRIC, TODO base, `micu pi evolve` foundation
+- **Correction filed**: FABRIC is NOT a DACMICU prerequisite. opencode's bash-callback form is a workaround for opencode lacking native `agent_end`/`triggerTurn`; Pi's in-agent driver covers Ralph natively. FABRIC is an independent capability (M20 gap), useful for shell pipelines, not for loop-until-done.
+- **Spirit-vs-implementation analysis**: 4 load-bearing properties of opencode PR #20074 — (1) judgment↔control split, (2) LLM commits via inspectable structure, (3) one uniform primitive, (4) recursive self-reach. Local stack matches (1)(2), wins on visibility / single-context, weaker on (3) uniformity, missing (4). Mid-step recursive judgment is the only real spirit gap.
+- **`pi-callback` extension** sketched as the gap-closer: opens Unix socket at process start, injects `PI_CALLBACK_SOCKET` into bash env, reuses subagent JSON-line RPC protocol in reverse. ~150 LOC extension + ~50 LOC CLI. Three-layer guarantee (lifecycle / env injection / install-or-promote) for TUI socket exposure documented.
+- **`--print` naming origin**: Claude Code convention; describes I/O behavior (print + exit), not lifecycle.
+- **`pi --mode rpc`** confirmed as the substrate for deep subagents; `rpc-client.ts` already uses it. Reverse-RPC for callback reuses the same wire format.
+- Updated: `dacmicu/concept.md` (umbrella framing + Correction block), `dacmicu/implementation-plan.md` (mode dispatch in-agent/subagent + correction), `implementations/pi-callback-extension.md` (TUI socket guarantee section, lifecycle edges, promotion roadmap), `architecture/pi-print-rpc-vs-oc-check.md` (--print naming, RPC for deep subagents, reverse-RPC reuse), `index.md`, `raw-sources/index.md`
+- New synthesis: `dacmicu/spirit-vs-opencode.md`
+
+## [2026-05-07] build+ingest | Code-evolve survey, mechanism taxonomy, pi-evolve extension, headless DACMICU comparison
+- User goal: lightweight code-evolve system on top of DACMICU (variants on git branches, single markdown index)
+- Phase 1 — surveyed evolve-systems-as-Pi-extensions: only `pi-autoresearch` (davebcn87, 6,443⭐) is mature; everything else is iteration without metric/archive. Niche for MATS-style branched-variant tree is empty.
+- Phase 2 — built `examples/extensions/pi-evolve.ts` (510 LOC, single file): `init_experiment` / `run_experiment` / `log_experiment` / `signal_evolve_success` tools; `agent_end` auto-loop; `before_agent_start` ledger injection; `session_before_compact` lossless snapshot; `session_start`/`session_tree` rehydration. Variants live as git branches `evolve/vN/slug`; `selection.md` is the human-readable ledger.
+- Phase 3 — fetched opencode #20074 (FABRIC PR) and #20018; documented the four DACMICU pillars (Manus CLI, Deterministic Split, Ralph Loop, Fabric Composition).
+- Phase 4 — compiled 20-mechanism taxonomy of deterministic agent control with contender matrix (Pi / opencode / Claude Code / Aider). Identified Pi's gaps for FABRIC: M1 (CLI callback), M7 (direct tool exec), M8 (env injection), M9 (timeout bypass), M20 (FABRIC composition).
+- Phase 5 — bidirectional Pi-extension primitive mapping: 50+ extensions categorized by purpose, every Pi hook/action mapped to its consumers, 8 core architectural patterns extracted (DACMICU auto-loop, state rehydration, per-turn injection, compaction-aware, git checkpoint, tool override, permission gate, subagent spawn).
+- Phase 6 — compared `pi --print` vs `pi --mode rpc` vs opencode `oc check` for headless deterministic control. Corrected initial framing after user pointed out bash CAN spawn `pi --mode rpc`: real gap is callback-into-current-session vs new-process-new-session, not capability vs incapability.
+- Phase 7 — sketched `pi-callback` design: Unix-socket callback extension (~200 LOC, pure extension, no core changes) using Pi's existing subagent/RPC mechanism in reverse. ~1-5ms latency vs opencode's ~5-40ms HTTP. Includes extension sketch + standalone CLI sketch + protocol spec.
+- New pages:
+  - `ecosystem/evolve-systems.md` — full survey: pi-autoresearch, MATS landscape, what pi-evolve fills
+  - `concepts/deterministic-agent-control-mechanisms.md` — 20-mechanism taxonomy + contender matrix
+  - `concepts/pi-extension-primitive-mapping.md` — bidirectional system↔hook mapping
+  - `architecture/pi-print-rpc-vs-oc-check.md` — headless control comparison
+  - `implementations/pi-evolve-extension.md` — pi-evolve docs (510 LOC extension)
+  - `implementations/pi-callback-extension.md` — pi-callback design (~200 LOC, Unix socket)
+- Updated: `index.md` (added Concepts + Implementations sections, new Architecture entry, evolve-systems under Ecosystem)
+
+## [2026-05-05] ingest | Pi hashline edit tools — comprehensive comparison
+- User shared https://github.com/RimuruW/pi-hashline-edit and asked for ALL other hashline/pi edit tools with in-depth comparison (stars, code quality, user sentiment)
+- Researched 10+ extensions across GitHub API, NPM registry, pi.dev package catalog, awesome-pi-coding-agent list
+- Key findings:
+  - **pi-hashline-edit** (RimuruW): 44 stars, ~225/week, focused read/edit replacement, 20+ test files, inspired by oh-my-pi
+  - **pi-hashline-readmap** (coctostan): 21 stars, ~756/week, replaces 5 tools + adds AST search + bash compression, 60+ test files, 18 language mappers
+  - **oh-my-pi** (can1357): 3,946 stars, 363 forks, full pi-mono fork with native hashline, origin of the concept
+  - **Footer extensions discovered**: pi-powerline-footer (201 stars, ~2,900/week), pi-fancy-footer (6 stars), pi-powerbar (22 stars), pi-vitals (6 stars), minimal-footer, custom-footer
+- Compiled into wiki pages:
+  - `ecosystem/pi-hashline-edit-tools.md` — Hashline-focused comparative reference (primary deliverable)
+  - `ecosystem/pi-footer-hashline-extensions.md` — Full landscape survey including footer/powerline tools
+- Updated: index.md, raw-sources/index.md
+
+## [2026-05-05] decide | Installed pi-hashline-edit + pi-read-map (composed combo)
+- User installed `npm:pi-hashline-edit` then `npm:pi-read-map` (latter with cosmetic tree-sitter peer-dep warning, harmless per pi-read-map README)
+- Final stack for hashline + structural maps: composed combo, not pi-hashline-readmap
+- Rationale: matches user's fact-based-over-heuristic preference; higher combined bus factor (6 distinct contributors); easier to audit and uninstall independently
+- Accepted trade-offs: no RTK bash compression, no `ast_search`, no `replace_symbol`, two-step symbol nav (read map → read offset)
+- Added three-way deep comparison section to `ecosystem/pi-hashline-edit-tools.md` covering readmap vs edit+read-map vs oh-my-pi across architecture, fact-vs-assumption behavior, what-you-give-up, project health, token economics, decision matrix, revisit triggers
+
+## [2026-05-05] update | Added pi-read-map (Whamp) to hashline reference
+- User flagged https://github.com/Whamp/pi-read-map after expressing skepticism about readmap's heuristic-heavy approach ("too assumption based rather than fact based")
+- Investigated: pi-read-map is **NOT** a hashline tool — it augments `read` with structural maps for large files (>2K lines / >50KB) using pure AST parsing (tree-sitter, ts-morph, Python/Go AST, ctags fallback)
+- Stats: 15 stars, 2 forks, 67 commits, ~141 weekly npm downloads, last push 2026-02-21 (slightly stale)
+- Inspired by codemap (kcosr/codemap)
+- This is the same structural-map feature pi-hashline-readmap includes, extracted as standalone
+- Composition: `pi-hashline-edit` + `pi-read-map` gives hashline edit safety + structural maps without readmap's heuristic recovery layer — appeals to "fact-based" preference
+- Updated: `ecosystem/pi-hashline-edit-tools.md` with section 4 (pi-read-map), composition guidance
+- User also confirmed installing `pi-hashline-edit` (npm install successful)
+
+## [2026-05-05] deep-dive | Source-level comparison of pi-hashline-edit vs pi-hashline-readmap
+- Read actual source code of both projects (`src/hashline.ts`, `src/edit.ts`, `prompts/edit.md`, `package.json`)
+- Discovered fundamental philosophy divergence:
+  - **pi-hashline-edit**: "Fail hard, be predictable" — stale anchors always rejected, no relocation, no fuzzy recovery. Trades convenience for correctness.
+  - **pi-hashline-readmap**: "Be helpful, recover gracefully" — auto-relocation (adaptive window up to ±100 lines), fuzzy token-similarity recovery, merge detection, echo stripping, wrapped-line restoration.
+- Code metrics: hashline-edit ~3,700 LOC / 32 tests; readmap ~12,200 LOC / **281 tests**
+- Prompt engineering: hashline-edit ~15 lines (concise rules); readmap ~200+ lines (decision matrix, 5 variants)
+- Hash format: hashline-edit uses custom 16-char alphabet (excludes hex/confusables/vowels); readmap uses 3-char hex
+- **oh-my-pi provenance**: readmap header says "Vendored & adapted from oh-my-pi" and ports heuristics (merge detection, confusable hyphens, restoreOldWrappedLines). hashline-edit says "Inspired by oh-my-pi" and deliberately stripped the heuristics.
+- Conclusion: readmap is closer to oh-my-pi in spirit and implementation; hashline-edit is stricter and more predictable.
+- Recommendation for pi-mono: hashline-edit (strict philosophy + lower migration risk). For general large-codebase work: readmap.
+- Updated: `ecosystem/pi-hashline-edit-tools.md` with full deep-dive section
+
+## [2026-05-05] update | Google Workspace `gws` CLI installed and validated end-to-end
+- Installed `@googleworkspace/cli` (`gws` 0.22.5) globally via npm
+- Cloned `googleworkspace/cli` separately and symlinked all 44 official `gws-*` skills into `~/.pi/skills/` (avoiding `pi install` route which fails on `lefthook` prepare hook)
+- Completed manual OAuth flow with colleague-provided client secret (Desktop app, project `fx-ml-260911`); credentials encrypted in macOS keyring
+- Hit and resolved both gating problems on the shared GCP project: missing `roles/serviceusage.serviceUsageConsumer` IAM grant, and disabled Workspace APIs (Calendar/Gmail/Drive/Docs/Sheets)
+- Validated Drive listing, Docs export-to-text, Calendar agenda, Gmail triage and search from inside Pi session
+- Rewrote `ecosystem/google-workspace.md` (previous version was stale and underclaimed surface - `gws` covers all Workspace APIs, not just Docs/Drive)
+
+## [2026-04-30] recover | Lost wiki pages recovered from Pi session transcripts
+- Discovered that pi-mono llm-wiki pages (created Apr 17, 21, 28) had been deleted from disk
+- Recovered 23 pages from Pi session JSONL write tool calls using `recover_wiki.py`
+- Recovered pages: architecture/* (3), comparisons/* (1), config/* (1), dacmicu/* (2), ecosystem/* (9), install/* (1), skills/* (1)
+- Also recovered `~/.pi/skills/llm-wiki/` skill files (SKILL.md, templates, REVIEW.md) and Claude Code project memory files
+- Updated SCHEMA.md, index.md, raw-sources/index.md to match recovered state
+
+## [2026-05-04] ingest | Web search provider research and extension comparison
+- Researched web search backends used by Claude.ai, Claude Code, ChatGPT, Gemini, LeChat
+- Conducted in-depth comparison of 8 Pi web search extensions/skills across code quality, stars, npm downloads, user sentiment
+- Confirmed Google offers no general-purpose web search API (Custom Search JSON API closed to new customers, retiring 2027)
+- Documented that `web_search` tool on this machine comes from `pi-web-access` (not pi-mono core); providers are `auto|perplexity|gemini|exa` (no Brave)
+- Set up standalone `brave-search` skill: copied from `badlogic/pi-skills`, ran npm install, added `BRAVE_API_KEY` to `~/.zprofile`, verified working
+- Documented repo-local `.pi/extensions/` (prompt-url-widget, redraws, tps) - committed by Mario Zechner, ship with pi-mono
+- Compiled findings into wiki pages:
+  - `ecosystem/web-search-providers.md` - Provider landscape (incl. Google API gap)
+  - `ecosystem/web-search-extensions.md` - Extension comparison
+  - `decisions/web-search-provider-strategy.md` - Decision + current reality + Brave skill setup
+  - `references/local-pi-setup.md` - Local Pi config snapshot
+- Updated: index.md, raw-sources/index.md
+
+## [2026-05-01] cross-link | Added Deterministic Agent Loops concept links
+- MetaHarness published `concepts/deterministic-agent-loops.md` comparing 10 systems across 5 categories
+- Updated pi-mono boundary pages with cross-links to new concept page:
+  - dacmicu/concept.md, comparisons/loop-architectures.md, index.md
+
+## [2026-04-30] cross-link | Interlinked pi-mono and MetaHarness wikis
+- Added cross-references from pi-mono boundary pages to MetaHarness research pages
+- Added cross-references from MetaHarness boundary pages to pi-mono implementation pages
+- The bridge is DACMICU/MATS: research lives in MetaHarness, implementation lives in pi-mono
+- Boundary pages updated:
+  - pi-mono: dacmicu/concept.md, dacmicu/pi-port.md, architecture/loop-internals.md, comparisons/loop-architectures.md
+  - MetaHarness: proposals/mats.md, systems/meta-harness.md, concepts/history-mechanisms.md, concepts/selection-policies.md
+
+## [2026-05-05] ingest | web-chat: Best web search extension for pi coding agent
+- Source: https://claude.ai/chat/08520c19-385d-4ff0-ad33-2bf3eb048d2f
+- File: raw-sources/conversations/2026-05-05-claude-best-web-search-extension-for-pi-coding-agent.md
+- Turns: 22
+
+## [2026-05-05] ingest | web-chat: Using Claude Pro/Max Team with pi
+- Source: https://claude.ai/chat/ee0c91af-50e5-43fe-9572-66efc58e5cc8
+- File: raw-sources/conversations/2026-05-05-claude-using-claude-pro-max-team-with-pi.md
+- Turns: 16
+
+## [2026-05-05] ingest | web-chat: Comparing OpenHarness, OpenCode, and OpenClaw architectures
+- Source: https://claude.ai/chat/d6360ed0-4936-41cd-847d-1d2f9e0fa8b5
+- File: raw-sources/conversations/2026-05-05-claude-comparing-openharness-opencode-and-openclaw-architectures.md
+- Turns: 175
+
+## [2026-05-05] ingest | web-chat: The __https://shittycodingage...
+- Source: https://claude.ai/chat/a23658e7-48e3-4e5b-bc12-0ef10adc3383
+- File: raw-sources/conversations/2026-05-05-claude-the-https-shittycodingage.md
+- Turns: 26
+
+## [2026-05-05] ingest | LLM chat ingestion subskill + research
+- Added: ecosystem/llm-chat-ingestion.md - design, OSS comparison, why CDP+real-Chrome
+- Built subskill at ~/.pi/agent/git/github.com/micuintus/llm-wiki/llm-wiki/skills/ingest-chat/
+- Validated end-to-end by ingesting 4 Claude.ai chats (see raw-sources/index.md)
+- Updated: index.md
+
+## [2026-05-05] compile | web-chat: Using Claude Pro/Max Team with pi
+- Added: ecosystem/anthropic-subscription-auth.md
+- Updated: index.md, raw-sources/index.md
+
+## [2026-05-05] compile | web-chat: Best web search extension for pi coding agent
+- Added: bugs/typebox-zod-schema-error.md
+- Updated: ecosystem/web-search-extensions.md (Mario's brave-search recommendation, simple Exa alternatives, pi-web-access setup, schema-error pointer), index.md, raw-sources/index.md
+
+## [2026-05-06] gap-close | Steering/follow-up semantics, default keybindings, dacmicu_loop tool design
+- Audit found three gaps from the chat that weren't in the wiki:
+  1. Steering vs follow-up practical semantics (timing, interruption vs deferred)
+  2. Default TUI keybindings (Enter=steer, Alt+Enter=followUp while streaming)
+  3. The "LLM emits loop spec via tool call" alternative as the primary DACMICU design (not just TODO mutation)
+- Compiled into:
+  - `architecture/steering-vs-followup.md` — full practical-semantics page: TL;DR table, where each is polled in runLoop(), worked example with multi-step tool chain, default keybinding mapping, why `Enter` defaults to steer, what both share / don't share
+- Updated:
+  - `dacmicu/implementation-plan.md` — added "Why not bash + `pi --print`" section citing visibility argument; rewrote Decision section to put `dacmicu_loop` LLM-emitted spec tool as the primary design (not just TODO mutation); added the loop-spec tool signature with TypeBox parameters; added `dacmicu_loop` to the architecture diagram; added cross-refs to subprocess-rpc-rendering and steering-vs-followup
+  - `index.md` — added steering-vs-followup under Architecture
+
+## [2026-05-06] ingest | Subprocess+RPC+custom-rendering + visibility argument — DACMICU UX deep-dive
+- User pointed out that `pi --print` ends up in invisible prompts (no visible nested tool calls), unlike opencode DACMICU where you see "tools called by the script" and subagents
+- Researched the visibility property across all four architectural options:
+  - Bash + `pi --print` from a bash tool: LLM literally writes `while`, but iterations are INVISIBLE (subprocess output is a single bash text blob)
+  - Subprocess + RPC + custom rendering: visibility preserved via `pi --mode rpc` event stream re-rendered with `AssistantMessageComponent`, `ToolExecutionComponent`, etc.
+  - In-session via `pi.sendMessage(triggerTurn:true)`: native visibility (events fire on parent's bus), single context window
+  - Hypothetical in-process loop tool: would require Pi core changes (nested run support)
+- Documented the subprocess+RPC+custom-rendering pattern as it's used by `ralph-loop-pi`, `lnilluv/pi-ralph-loop`, `pi-mono/examples/extensions/subagent`
+- Brave-search follow-up surfaced FOUR additional Pi Ralph extensions not in initial survey:
+  - `rahulmutt/pi-ralph` (minimalist, branches new session per iteration; closest to "fresh context every iteration" Ralph original)
+  - `mikeyobrien/pi-ralph` (PTY-embeds external `ralph` CLI v2.4.4)
+  - `mikeyobrien/pi-autoloop` (PTY-embeds external `autoloop` CLI; presets for autocode/autoqa/autotest/autofix/autoreview/autosec/autospec)
+  - `emanuelcasco/pi-mono-extensions/loop` (cron-style `/loop [interval] <prompt>`, like Claude Code `/loop`)
+- Compiled into wiki pages:
+  - `architecture/subprocess-rpc-rendering.md` — full pattern walkthrough (subprocess, RPC protocol, custom rendering with Pi's exported components, trade-offs, when not to use it)
+- Updated:
+  - `ecosystem/loop-extensions.md` — rewritten as comprehensive survey: 9 extensions, 6 architectural variants (in-process LLM-driven, in-process agent_end-driven, subprocess+RPC, branched-session, PTY-embedded external, hat-based), full comparison table, recommendation matrix, hook-surface usage table, detailed pattern signatures
+  - `index.md` — added subprocess-rpc-rendering under Architecture; updated loop-extensions tagline
+
+## [2026-05-06] ingest | Ralph/until-done/TODO ecosystem + Claude Code /loop — DACMICU validation
+- User asked for in-depth research on (1) Ralph Loop extensions in Pi, (2) until-done extensions, (3) TODO list extensions, (4) Claude Code's /loop, then conclusion on how to pull off DACMICU in Pi
+- Researched via Brave/Perplexity/Exa + fetched primary sources: lnilluv/pi-ralph-loop, ralph-loop-pi npm, @tmustier/pi-ralph-wiggum, samfoy/pi-ralph, latent-variable/pi-auto-continue, kostyay/agent-stuff loop.ts, pi-mono examples/extensions/todo.ts, forjd/pi-todo-md, patriceckhart/pi-todo, Claude Code /loop docs, Geoffrey Huntley's Ralph blog post
+- Key findings:
+  - **Three architectural variants** of Ralph in Pi: in-process LLM-driven (tmustier ralph-wiggum), subprocess-per-iteration (ralph-loop-pi/lnilluv), hat-based multi-agent (samfoy)
+  - **DACMICU pattern is already implemented** by `kostyay/agent-stuff/pi-extensions/loop.ts`: signal_loop_success tool + agent_end listener + sendMessage(triggerTurn:true) + session_before_compact for state preservation
+  - **Pi-auto-continue** is the minimalist pattern (~50 LOC): agent_end → sendUserMessage with hard cap
+  - **All loop extensions use existing Pi extension API only** — no core changes needed (validates dacmicu/pi-port architecture decision)
+  - **Claude Code /loop is fundamentally different**: cron-scheduled (timed), not immediate (event-driven). Three modes: fixed interval, dynamic interval (Claude picks), bare /loop (uses loop.md or built-in maintenance prompt). 7-day expiry, 30min jitter, fires between turns. Complementary to Ralph, not equivalent.
+- Compiled into wiki pages:
+  - `ecosystem/loop-extensions.md` — Ralph/until-done extension survey with architecture comparison table and hook-surface analysis
+  - `ecosystem/claude-code-loop.md` — /loop mechanics, Pi vs Claude Code comparison, sketch of how Pi could implement /loop-style scheduling
+  - `dacmicu/implementation-plan.md` — concrete build plan: hooks, architecture, mode split, what to compose from existing extensions, open issues
+- Updated:
+  - `dacmicu/pi-port.md` — added "Validation: existing extensions already use this exact pattern" section citing kostyay/loop.ts; added refinements (session_before_compact, hasPendingMessages guard, aborted-turn detection, condition summarization); bumped date and sources; cross-ref to implementation-plan
+  - `dacmicu/concept.md` — added see-also entries for implementation-plan, loop-extensions, claude-code-loop
+  - `ecosystem/todo-visualizations.md` — replaced placeholder content with concrete extension survey, reference impl walkthrough, DACMICU+TODO combo sketch, polish-gap analysis
+  - `index.md` — added loop-extensions, claude-code-loop, implementation-plan entries; bumped todo-visualizations and pi-port dates
+
+## [2026-05-06] ingest | Component interaction diagram — keystroke to agent loop and back
+- User asked for the exact path from TUI keystroke to agent loop and how components interact
+- Traced through:
+  - `InteractiveMode.setupEditorSubmitHandler` → `AgentSession.prompt` → `Agent.prompt` → `runAgentLoop` → `runLoop`
+  - Verified package boundaries: `pi-tui` (generic widgets), `pi-agent-core` (generic loop), `pi-coding-agent` (product layer)
+  - Verified event flow back up: `Agent.processEvents` → `AgentSession._handleAgentEvent` → `InteractiveMode.handleEvent`
+- Compiled into wiki page:
+  - `architecture/component-flow.md` — ASCII diagram + component boundary table + event flow explanation
+- Updated:
+  - `architecture/agent-loop.md` — added cross-references, closed open questions about file-level entry points, bumped date
+  - `architecture/loop-internals.md` — added cross-reference to component-flow, bumped date
+  - `index.md` — added component-flow under Architecture
+
+## [2026-05-05] ingest | web-chat: Gemini search on best pi footer/layout extension
+- Source: https://gemini.google.com/share/33a9722babec
+- File: raw-sources/conversations/2026-05-05-gemini-do-a-web-search-for-the-very-best-pi-extention-that-changes-.md
+- Turns: 2
+- Outcome: **Not compiled.** Response is largely confabulated (fake star counts, fake author handles, fabricated `pi-generative-ui` extension). Verified facts (`pi-powerline-footer`, `oh-my-pi`) are already covered by `ecosystem/footer-themes.md`. Source kept as record of Gemini output with reliability note in the file header.
