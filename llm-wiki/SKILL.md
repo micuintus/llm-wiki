@@ -53,7 +53,7 @@ in `log.md` so wiki state is transparent.
    credentials. Redact credentials from any copied material.
 
 2. **Compile.** Distill the source into pages in `<topic>/`. Merge with
-   `str_replace` (don't rewrite); append to `sources:`; bump `updated:`.
+   targeted edits (don't rewrite); append to `sources:`; bump `updated:`.
    Cascade to other affected pages. Forward references to pages not yet
    compiled are acceptable — they self-resolve as the wiki grows.
    Annotate conflicts inline with attribution. Archive pages

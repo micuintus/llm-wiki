@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.2] — 2026-05-07
+
+### Fixed
+- **`str_replace` → "targeted edits"** in SKILL.md Compile step. Pi's tool is named `edit`; the term `str_replace` is Anthropic-tool-API jargon. When the model reads `str_replace` in the skill text, it may look for a tool that doesn't exist in Pi. Reworded to be tool-agnostic. (Thanks to a friendly reviewer for spotting.)
+
 ## [1.4.1] — 2026-05-07
 
 ### Added
