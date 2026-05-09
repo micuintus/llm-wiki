@@ -11,7 +11,11 @@ sources:
   - https://github.com/forjd/pi-todo-md
   - https://github.com/patriceckhart/pi-todo
   - https://github.com/jayshah5696/pi-agent-extensions
-tags: [extension, todo, dacmicu, widget, ui]
+  - https://github.com/tintinweb/pi-manage-todo-list
+  - https://github.com/tintinweb/pi-tasks
+  - https://github.com/Soleone/pi-tasks
+  - https://github.com/mitsuhiko/agent-stuff/blob/main/extensions/todos.ts
+tags: [extension, todo, dacmicu, widget, ui, idiomatic-tools]
 see_also:
   - "loop-extensions.md"
   - "claude-code-loop.md"
@@ -37,12 +41,16 @@ Pi has implementations of all three. None match Claude Code's `TodoWrite` widget
 
 ## Surveyed extensions
 
-| Extension | Pattern | State location | UI |
-|-----------|---------|----------------|----|
-| **`pi-mono/examples/extensions/todo.ts`** | Tool-only (reference impl) | Session JSONL via `tool_result.details` | `/todos` slash command opens read-only viewer |
-| **`forjd/pi-todo-md`** | Tool + repo-local `TODO.md` | `TODO.md` in nearest git root | File visible in editor; LLM uses `todo_md` tool |
-| **`patriceckhart/pi-todo`** | Tool + Apple Reminders sync | macOS Reminders ("pi" list) via Swift+EventKit helper | Interactive TUI for browse/edit |
-| **`jayshah5696/pi-agent-extensions`** | Bundle including TODO-related items | varies | varies |
+| Extension | LOC | Pattern | Tool shape | Trained-on origin | State | UI | Notes |
+|-----------|-----|---------|------------|-------------------|-------|----|-------|
+| `pi-mono/examples/extensions/todo.ts` | 297 | Tool-only (reference) | Custom (`add`/`update`/`remove`/`set-state`) | None — bespoke | session `details` | `/todos` slash | Branch-safe pattern; canonical starting point |
+| **`tintinweb/pi-manage-todo-list`** | **506** | **Tool + widget + slash** | **`manage_todo_list` `{operation: read\|write, todoList}`** | **GitHub Copilot Chat — verbatim** | session `details` (branch-safe) | `setWidget` factory + theme + strikethrough + `/todos` | **Recommended DACMICU TODO base.** See [research 2026-05-08 § Q2](../dacmicu/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension). |
+| `tintinweb/pi-tasks` | 2,061 | 7 tools + DAG + file-backed | `TaskCreate`/`TaskList`/`TaskGet`/`TaskUpdate`/`TaskOutput`/`TaskStop`/`TaskExecute` | Claude Code — verbatim | file-backed (cross-session) | Animated star spinner, deps shown | Author markets as successor; rejected for DACMICU (DAG fights deterministic outer loop) |
+| `Soleone/pi-tasks` | 3,566 | Pluggable backends | Variable per backend | Variable | beads / `todo.md` / … | Yes | Heavyweight |
+| `mitsuhiko/agent-stuff/todos.ts` | 2,082 | Tool + file-per-todo | Custom (markdown files) | None | `.pi/todos/*.md` | Status indicator | File-on-disk, less branch-safe |
+| `forjd/pi-todo-md` | — | Tool + repo `TODO.md` | `todo_md` | None | `TODO.md` in git root | File visible in editor | Human + LLM shared edits |
+| `patriceckhart/pi-todo` | — | Tool + Apple Reminders sync | Custom + EventKit helper | None | macOS Reminders | Interactive TUI | macOS-only |
+| `jayshah5696/pi-agent-extensions` | — | Bundle | Variable | None | Variable | Variable | Pick-and-mix |
 
 ## Reference implementation: `pi-mono/examples/extensions/todo.ts`
 
@@ -118,6 +126,19 @@ pi.on("before_agent_start", async () => {
 ```
 
 This is the design sketched in [dacmicu/pi-port](../dacmicu/pi-port.md) — and validated by `kostyay/agent-stuff/pi-extensions/loop.ts` (a similar pattern minus the TODO list). The TODO + loop combo is not packaged together yet; assembling them is straightforward.
+
+## Idiomaticity matters: matching trained-on tool shapes
+
+LLMs are heavily trained on two TODO-tool shapes:
+
+| Shape | Trained-on origin | Pi extension that mirrors it |
+|---|---|---|
+| `manage_todo_list` (single tool, `read`/`write`, complete-replacement semantics) | GitHub Copilot Chat | **`tintinweb/pi-manage-todo-list`** — verbatim |
+| `TodoWrite` / `TaskCreate` family (many tools, granular ops, status enum, optional DAG) | Claude Code | `tintinweb/pi-tasks` — verbatim |
+
+If an extension matches one of these shapes, the LLM uses it correctly with **zero system-prompt fine-tuning**. Inventing a custom tool shape (the in-tree reference, mitsuhiko, forjd, patriceckhart) burns prompt tokens teaching the LLM your schema and accepts a quality gap until the model has seen enough of your examples in-session.
+
+**For DACMICU we want the smaller idiomatic shape (`manage_todo_list`) plus our deterministic outer loop layered on top, not the larger one (`pi-tasks`) whose built-in DAG and file-backed sharing fight the loop driver.** See [research 2026-05-08 § Q2](../dacmicu/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension) for the full reasoning.
 
 ## Why no Pi extension matches Claude Code's `TodoWrite` polish
 

@@ -25,6 +25,7 @@ Catalog of compiled pages for the pi-mono project.
 - [DACMICU Modular Architecture](dacmicu/modular-architecture.md) — [Decision] Six-package monorepo, dep DAG, Pi-package module-isolation constraint, three delivery strategies, verified primitives table. *Updated: 2026-05-08*
 - [DACMICU Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; bash + `pi --print` is anti-pattern; subprocess + RPC for true subagents. *Updated: 2026-05-08*
 - [DACMICU Implementation Plan](dacmicu/implementation-plan.md) — Build sequence against the modular architecture; 6 packages, ~1700 LOC total. *Updated: 2026-05-08*
+- [DACMICU Research 2026-05-08 — Subagent reuse, TODO base, Variant A](dacmicu/research-2026-05-08-subagent-and-todo.md) — [Decision] **Per-consumer provider selection**: ralph→Hopsken (in-process modal), evolve→**HazAT** (multiplexer panes — better than opencode for parallel inspection); peer-depend on `tintinweb/pi-manage-todo-list`; Variant A skeleton (~150 LOC). Total custom code ~500 LOC. *Updated: 2026-05-08 evening*
 - [DACMICU Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — [Synthesis] Load-bearing properties of opencode PR #20074 mapped against the local stack; uniformity recovered via shared library; mid-step recursive judgment closed by fabric. *Updated: 2026-05-08*
 
 ## Concepts
@@ -45,7 +46,7 @@ Catalog of compiled pages for the pi-mono project.
 - [Anthropic Subscription Auth](ecosystem/anthropic-subscription-auth.md) — Why pi `/login` lands on extra-usage, not main budget; how oh-my-pi works around it. *Updated: 2026-05-05*
 - [LLM Chat Ingestion](ecosystem/llm-chat-ingestion.md) — Ingesting web LLM chats (Claude.ai, ChatGPT, Gemini, Le Chat) into the wiki via CDP-against-real-Chrome. *Updated: 2026-05-05*
 - [LLM Wiki Skills](ecosystem/llm-wiki-skills.md) — Skill comparison and review. *Updated: 2026-04-29*
-- [Subagents](ecosystem/subagents.md) — Deep cascade of 7 implementations: three architectural patterns (subprocess+JSON / subprocess+RPC / in-process via `createAgentSession`); Hopsken's ConversationViewer is the gold-standard navigability primitive. *Updated: 2026-05-08*
+- [Subagents](ecosystem/subagents.md) — **Comprehensive 12+-extension survey across four architectural patterns** (subprocess+JSON, subprocess+RPC, in-process via `createAgentSession`, **multiplexer-pane-per-subagent**); HazAT/pi-interactive-subagents is the only opencode-Cmd+↓-equivalent UX in Pi (and beats opencode for parallel inspection); ConversationViewer truncates at 500 chars. *Updated: 2026-05-08 evening*
 - [Todo List Extensions](ecosystem/todo-visualizations.md) — Survey + the four-layer widget stack (renderResult / setWidget-factory / registerMessageRenderer / ui.custom). Closes the Claude-Code-TodoWrite polish gap. *Updated: 2026-05-08*
 - [Loop Extensions](ecosystem/loop-extensions.md) — 14-project comparative survey across 7 architectural variants. Source-path corrections for mitsuhiko, tmustier, lnilluv. *Updated: 2026-05-08*
 - [Claude Code /loop](ecosystem/claude-code-loop.md) — Cron-scheduled task repetition; comparison vs Pi's immediate Ralph loops. *Updated: 2026-05-06*

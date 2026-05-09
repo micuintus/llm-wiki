@@ -43,6 +43,18 @@ Both variants share the same outer loop driver (`@pi-dacmicu/base`'s `attachLoop
 
 **Subagents are by definition context-isolated.** There is no such thing as an "in-session subagent" — if you're sharing the parent's `state.messages`, you're just another turn (Variant A), not a subagent. The orthogonal axis "subprocess vs in-process" describes *where the subagent runs*, not whether it has its own context. See [ecosystem/subagents](../ecosystem/subagents.md) for the full taxonomy.
 
+### Variant A in five primitives
+
+The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics and a drop-in skeleton in [research 2026-05-08 § Q3](research-2026-05-08-subagent-and-todo.md#q3--how-does-the-in-session-lightweight-dacmicu-variant-variant-a-work).
+
+1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop".
+2. **Termination predicate** — any of: `signal_loop_success` called, iteration cap hit, task predicate false, turn aborted, **`ctx.hasPendingMessages()` true** (yield to user mid-turn).
+3. **`pi.sendMessage({customType, content, display:true}, {triggerTurn:true, deliverAs:"followUp"})`** — appends a synthesized "user message" to the same `state.messages` and reschedules a turn through `agent.followUp()`. Full prior context preserved.
+4. **`signal_loop_success` tool** — LLM-callable break statement. Pairs with the iteration cap (the involuntary break).
+5. **`session_before_compact` preservation** — mark `customType: "dacmicu-*"` messages so `/compact` mid-loop doesn't drop the loop's reasoning chain. Only `mitsuhiko/agent-stuff/loop.ts` does this in the existing ecosystem; it is the rarest and most important detail.
+
+Not a subagent. Not a subprocess. Not autonomous — the LLM still drives every turn; the driver only schedules *when* the next turn fires.
+
 ## Umbrella framing (six modular packages)
 
 DACMICU is the **umbrella primitive** unifying four downstream concerns, plus two infrastructural ones. Implementation is a six-package monorepo (see [modular-architecture](modular-architecture.md)) sharing one runtime library:
@@ -52,7 +64,7 @@ DACMICU is the **umbrella primitive** unifying four downstream concerns, plus tw
 3. **TODO system base** (`@pi-dacmicu/todo`) — structured TODO list as the loop's natural state machine. Variant A consumer. Hard-depends on `@pi-dacmicu/base`.
 4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. Variant B consumer (each candidate evaluated in isolation). Prototyped as `examples/extensions/pi-evolve.ts` (510 LOC, in-tree); will be repackaged consuming `@pi-dacmicu/base` + a third-party subagent provider. See [pi-evolve-extension](../implementations/pi-evolve-extension.md).
 5. **Loop primitive** (`@pi-dacmicu/base`) — `agent_end`-driven scheduler with compaction preservation, abort detection, and breakout tool. Substrate-agnostic (Variant A or B). Exports the runtime as a library for the four consumers above.
-6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08.** Standing on Hopsken/tintinweb's shoulders: Variant B consumers integrate via `pi.events`-based RPC against an installed `Hopsken/pi-subagents` (or `tintinweb/pi-subagents`). Rationale: their `createAgentSession` + ConversationViewer + agent-tree widget + cross-extension RPC is ~10K LOC of production-validated code we'd otherwise reinvent. See [Subagent build-vs-reuse decision](#subagent-build-vs-reuse-decision-2026-05-08) below.
+6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08.** Standing on the existing Pi subagent ecosystem: **per-consumer** provider selection. `@pi-dacmicu/ralph` (Variant B) consumes `Hopsken/pi-subagents` (or tintinweb superset) via `pi.events` RPC; `@pi-dacmicu/evolve` consumes **`HazAT/pi-interactive-subagents`** (multiplexer-pane-per-subagent, the only Pi extension matching opencode-Cmd+↓ parallel-inspection UX). See [research-2026-05-08 § Q5](research-2026-05-08-subagent-and-todo.md#q5--which-subagent-provider-should-pi-dacmicuevolve-actually-use) and [ecosystem/subagents](../ecosystem/subagents.md) for the full 12+-extension survey and four architectural patterns (subprocess+JSON, subprocess+RPC, in-process via `createAgentSession`, multiplexer-pane).
 
 The four downstream concerns are specializations of the loop primitive in `base` with different termination predicates and execution substrates — not separate features. Splitting into packages reflects user-facing concerns (each is independently useful), not a fragmentation of the underlying primitive.
 
@@ -68,7 +80,7 @@ The deep ecosystem cascade ([ecosystem/subagents](../ecosystem/subagents.md)) fo
 |---|---|---|
 | In-process subagent via `createAgentSession` | `src/agent-runner.ts` (439 LOC) | ~400 LOC |
 | Subprocess subagent via `pi --mode json` (optional) | not implemented; only in-process | n/a (we'd add) |
-| ConversationViewer modal (live `session.subscribe` updates, opencode-Tab-equivalent) | `src/ui/conversation-viewer.ts` (243 LOC) | ~250 LOC |
+| ConversationViewer modal (live `session.subscribe` updates — read-only, 500-char-truncated, single-agent, modal-blocks-parent; **NOT a Tab-switch equivalent**, see [research § Q4](research-2026-05-08-subagent-and-todo.md#q4--is-conversationviewer-an-opencode-tab-switch-equivalent-no)) | `src/ui/conversation-viewer.ts` (243 LOC) | ~250 LOC |
 | Always-visible agent-tree widget (Braille spinners, live tool activity, token counts) | `src/ui/agent-widget.ts` (488 LOC) | ~500 LOC |
 | Cross-extension RPC (`pi.events.on/emit` with scoped reply channels, `PROTOCOL_VERSION`, success/error envelope) | `src/cross-extension-rpc.ts` (95 LOC) | ~100 LOC |
 | Custom agent loading from `.pi/agents/*.md` (project + global) | `src/custom-agents.ts` (137 LOC) | ~150 LOC |
@@ -141,6 +153,7 @@ FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/
 - [modular-architecture](modular-architecture.md) — six-package monorepo, dep DAG, module-isolation constraint, delivery strategies
 - [pi-port](pi-port.md) — porting DACMICU to Pi: `triggerTurn`, `agent_end`, extension hooks; in-session driver as THE port
 - [implementation-plan](implementation-plan.md) — build sequence against the modular architecture
+- [research-2026-05-08-subagent-and-todo](research-2026-05-08-subagent-and-todo.md) — reuse decisions for subagent provider + idiomatic TODO base + Variant A skeleton (~150 LOC)
 - [spirit-vs-opencode](spirit-vs-opencode.md) — synthesis: separating DACMICU's load-bearing ideas from the bash-callback substrate; spirit gaps and wins
 - [../implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — closes the mid-step recursive judgment gap
 - [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — current MATS-style consumer of the umbrella
