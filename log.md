@@ -1,5 +1,10 @@
 # Wiki Log
 
+## [2026-05-08 evening, addendum] | Patterns deep-dive expanded inline in ecosystem/subagents.md
+- Expanded the four-pattern section from ~50 lines (capsule descriptions) to ~280 lines covering: how-it-works code sketch, what-you-get / what-you-give-up trade-offs, when-this-pattern-wins criteria, LOC characterization, and (for Pattern 3) a Hopsken component-LOC breakdown.
+- Added cross-pattern comparison table (11 dimensions × 4 patterns) and "why DACMICU ends up with two providers" closing argument.
+- No new findings — pure pedagogical expansion of existing material so the wiki is self-contained for future readers.
+
 ## [2026-05-08] research-deepening | Comprehensive Pi subagent re-survey (12+ extensions); opencode UX corrected; HazAT discovery changes evolve plan
 - User asked for (1) deeper research on opencode's actual subagent view UX, (2) much more comprehensive Pi subagent survey.
 - **Opencode actual UX (post-PR #14814 merged 2026-02-27)**: hierarchical session navigation. `<leader>+down` (`session_child_first`) enters first child; bare `right`/`left` cycle siblings (only when in child); bare `up` (`session_parent`) returns to parent. **One full-screen view at a time**. **NO TABS** — tab bar is open feature request ([#5826](https://github.com/anomalyco/opencode/issues/5826), [#17838](https://github.com/anomalyco/opencode/issues/17838)). Sessions are first-class navigable entities, not modal overlays. Open bugs: "view subagents" button broken ([#16796](https://github.com/anomalyco/opencode/issues/16796)), CLI mode strips subagent output ([#19278](https://github.com/anomalyco/opencode/issues/19278)), parent looks stuck loading when subagent blocks ([#10802](https://github.com/anomalyco/opencode/issues/10802)).

@@ -86,63 +86,290 @@ Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standa
 |---|---|---|---|
 | `Jberlinsky/oh-my-pi` | 391K | Pi fork with built-in Task tool, `agent://<id>` resources as first-class URIs, real-time artifact streaming | Fork — not an extension |
 
-## Architecture patterns — four distinct approaches
+## Architecture patterns — four distinct approaches, in depth
 
-### Pattern 1 — Subprocess + JSON event stream
+These are *implementation* patterns, not capabilities. Capabilities (parallel, chain, orchestrator, pool) are orthogonal — most patterns can support most capabilities. What changes between patterns is **where the child runs, how the parent observes it, and how output flows back**.
+
+---
+
+### Pattern 1 — Subprocess + line-delimited JSON event stream
+
+**Used by**: in-tree reference, aleclarson/jamwil, elpapi42, jerryan, drsh4dow, e9n (espennilsen), nicobailon, @ifi (nicobailon fork), cmf (as a library).
+
+#### How it works
 
 ```ts
-spawn("pi", ["--mode", "json", "-p", "--no-session" /* or --session <jsonl> */, ...args]);
+const proc = spawn("pi", [
+  "--mode", "json",     // emit line-delimited JSON events instead of a TUI
+  "-p", task,           // -p = "prompt" mode, run-and-exit
+  "--no-session",       // or --session <jsonl-path> to inherit parent context
+  ...flags
+], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+
+proc.stdout.on("data", chunk => {
+  for (const line of buffer.split("\n")) {
+    const event = JSON.parse(line);
+    if (event.type === "message_end") messages.push(event.message);
+    if (event.type === "tool_result_end") toolResults.set(event.id, event.result);
+    if (event.type === "usage") usage = event.usage;
+  }
+});
+
+await once(proc, "exit");
+return { messages, finalOutput, usage, exitCode };
 ```
 
-Parent parses line-delimited `message_end` + `tool_result_end` events → `Message[]` → stores in `result.details` → re-renders in `renderResult` using Pi's exported components.
+#### What you get
 
-**Used by**: in-tree reference, aleclarson/jamwil, nicobailon, elpapi42, e9n, jerryan, drsh4dow, cmf (as library).
+- **True process isolation.** Crash in child can't take down parent. Memory leaks are reaped.
+- **Clean context separation by default.** The child boots a fresh Pi with its own session, model, tools.
+- **Optional context inheritance.** Pass `--session <jsonl-path>` to fork the parent's history (aleclarson `fork` mode).
+- **Re-renderable transcripts.** Parser stores `Message[]` in `result.details`; parent's `renderResult` pulls Pi's own message-renderer components and re-renders the child's transcript inline. This is what `packages/coding-agent/examples/extensions/subagent/` demonstrates.
+- **Cheap parallelism.** N children = N processes. OS scheduler does the work.
 
-### Pattern 2 — Subprocess + RPC mode (steerable, multi-turn)
+#### What you give up
+
+- **Process spawn cost.** ~200-500ms per child to boot Pi, load extensions, read settings. Matters when you fan out 20 ways.
+- **No mid-flight steering.** `pi --mode json -p` is run-and-exit. To steer or abort, the parent must SIGTERM the child or use Pattern 2.
+- **Result is a *log*, not a *living view*.** You see the child's history after it ends. Live progress requires polling stdout for `message_update` events and rendering them ad-hoc.
+- **Tool registration in the child** is whatever the child's pi config does. Parent can't inject a tool into the child unless it preconfigures the child's settings.
+
+#### When this pattern wins
+
+- **Stateless one-shot delegations.** "Search this directory for X." "Review this diff." Spawn, await, render result, done.
+- **Parallel fan-out where each child is independent.** N reviews on N different files — no shared state, no inter-agent coordination.
+- **When you want to be sure the child can't mess with parent.** Hard isolation guarantee.
+- **When you don't have control over the parent extension's runtime.** Subprocess works from anywhere, including non-extension CLI tools.
+
+#### Concrete LOC characterization
+
+Minimum viable: ~150 LOC (drsh4dow `pi-delegate`). With a result viewer + JSONL writer + truncation: ~1,000-2,000 LOC (aleclarson, elpapi42). With chain/parallel/orchestrator/pool/clarify: ~20,000+ LOC (nicobailon).
+
+---
+
+### Pattern 2 — Subprocess + JSON-RPC over stdin/stdout (`pi --mode rpc`)
+
+**Used by**: lnilluv/pi-ralph-loop only (and it's not a generic subagent extension — it's a ralph driver).
+
+#### How it works
 
 ```ts
-spawn("pi", ["--mode", "rpc", ...]);
+const proc = spawn("pi", ["--mode", "rpc", ...], {
+  stdio: ["pipe", "pipe", "pipe"]   // stdin is the request channel
+});
+
+// JSON-RPC framing: Content-Length headers + JSON bodies
+const rpc = createRpcChannel(proc.stdin, proc.stdout);
+
+await rpc.request("session.start", { task: "..." });
+const turnDone = rpc.subscribe("turn_end", evt => { /* ... */ });
+
+// Mid-run controls (impossible in Pattern 1)
+await rpc.request("session.steer", { message: "Wrap up immediately" });
+await rpc.request("session.abort", {});
+
+// Pause-resume via OS signals (process is still alive)
+process.kill(proc.pid, "SIGSTOP");
+process.kill(proc.pid, "SIGCONT");
 ```
 
-JSON-RPC over stdin/stdout. Allows mid-run `steer`, `follow_up`, `abort`, plus pause-resume via SIGSTOP/SIGCONT. ~5× the LOC of the JSON path.
+#### What you get
 
-**Used by**: lnilluv/pi-ralph-loop only.
+- **Bidirectional channel.** Parent can issue commands mid-turn: steer, follow-up, abort, pause, resume.
+- **Live event subscription.** `turn_end`, `message_update`, `tool_execution_start` flow back as JSON-RPC notifications.
+- **Long-lived child.** One spawn = many turns. Amortizes spawn cost across the session.
+- **Process isolation still preserved.** Same crash/leak guarantees as Pattern 1.
 
-### Pattern 3 — In-process via `createAgentSession`
+#### What you give up
+
+- **~5× the LOC of Pattern 1.** RPC framing, request correlation IDs, notification dispatch, timeout handling, channel cleanup on child crash. lnilluv is ~1,300 LOC for basic ralph; a generic subagent provider would be more.
+- **Coupling to Pi's RPC schema.** If `pi --mode rpc` changes its method names or notification payloads (no semver guarantee documented), the extension breaks.
+- **Same context-isolation defaults.** Still need `--session` flag for context inheritance.
+
+#### When this pattern wins
+
+- **Long-lived steerable children.** Ralph loops where the parent wants to nudge the child mid-iteration. Background investigators that need redirection.
+- **When you need pause-resume.** A budget-aware orchestrator that suspends idle children to free model capacity. Nobody actually does this yet.
+- **When a single child handles N tasks.** Spawn one specialist child, ask it 10 questions over the session.
+
+#### Why nobody else uses it for subagents
+
+Pattern 1 covers most one-shot needs more cheaply. Pattern 3 covers steering needs in-process with zero subprocess overhead. Pattern 2 sits in an awkward middle — too heavy for one-shots, too process-isolated when in-process is available.
+
+---
+
+### Pattern 3 — In-process via `createAgentSession` SDK
+
+**Used by**: Hopsken/pi-subagents (production gold standard), tintinweb/pi-subagents (Hopsken superset + scheduling), tuansondinh/pi-fast-subagent.
+
+#### How it works
 
 ```ts
-import { createAgentSession, SessionManager, SettingsManager } from "@mariozechner/pi-coding-agent";
+import {
+  createAgentSession,
+  SessionManager,
+  SettingsManager,
+} from "@mariozechner/pi-coding-agent";
 
 const { session } = await createAgentSession({
-  cwd, sessionManager: SessionManager.inMemory(cwd),
+  cwd,
+  sessionManager: SessionManager.inMemory(cwd),  // or .persistent(path)
   settingsManager: SettingsManager.create(),
-  modelRegistry: ctx.modelRegistry, model, tools, resourceLoader,
+  modelRegistry: ctx.modelRegistry,              // share parent's
+  model: "claude-opus-4-7",                      // override per-child
+  tools: parentTools,                            // optionally filtered
+  resourceLoader: ctx.resourceLoader,
 });
-session.setActiveToolsByName(toolNames);
-await session.bindExtensions({ onError: ... });
-const unsub = session.subscribe(event => { /* turn_end, message_update, tool_execution_start */ });
+
+session.setActiveToolsByName(["bash", "read", "edit"]);   // narrow tool surface
+await session.bindExtensions({ onError: (err) => log(err) });
+
+const unsubscribe = session.subscribe(event => {
+  if (event.type === "turn_end") onComplete(event);
+  if (event.type === "message_update") render(event);
+  if (event.type === "tool_execution_start") trackActivity(event);
+});
+
+await session.sendMessage({ content: task, triggerTurn: true });
+
+// Mid-flight controls — same process, direct method calls
 session.steer("Wrap up immediately");
 session.abort();
 ```
 
-Zero subprocess overhead. Full event subscription. Supports `steer()` and `abort()`. SDK exports per `@mariozechner/pi-coding-agent/dist/index.d.ts:15`.
+#### What you get
 
-**Used by**: Hopsken (production gold-standard), tintinweb (superset), tuansondinh.
+- **Zero subprocess overhead.** No spawn, no IPC, no JSON parsing. Direct in-memory function calls.
+- **Full event subscription.** Subscribe to the same `AgentSessionEvent` stream Pi's own InteractiveMode subscribes to. Live updates are the natural shape.
+- **Direct steering and abort.** No marshalling — just method calls on the `AgentSession` object.
+- **Shared `ModelRegistry`.** Parent's auth, rate limits, model cache all carry over. No re-login per child.
+- **The richest UI surface.** Hopsken's `ConversationViewer` (`session.subscribe` → live re-render) and agent-tree widget (Braille spinners, live token counts) are only viable in this pattern. Subprocess transcripts can be re-rendered post-hoc but not made live without polling.
 
-### Pattern 4 — Terminal multiplexer pane per subagent
+#### What you give up
+
+- **No process isolation.** A bug in the child's tool execution can crash the parent. An infinite loop in child Pi tool burns the parent's process.
+- **Memory accumulation.** Long-running parents that spawn many children accumulate session state unless explicitly torn down.
+- **Tool conflicts.** Tools registered in the parent's process are visible to the child unless filtered. `setActiveToolsByName` mitigates but isn't bulletproof.
+- **SDK coupling.** `createAgentSession` is the most internals-exposing SDK surface — not yet documented as semver-stable. Hopsken pins to a specific Pi version range. Each Pi minor version may break.
+
+#### When this pattern wins
+
+- **Live oversight.** When the user actively watches the child and steers it. Hopsken's modal ConversationViewer is unmatched here.
+- **Frequent short tasks.** When subprocess spawn cost would dominate (e.g. "summarize this snippet" over 50 turns of a parent loop).
+- **When parent and children share a ModelRegistry.** No login flow per child. No quota fragmentation.
+- **Cross-extension RPC backbones.** Hopsken exposes its in-process subagents over `pi.events` so other extensions (DACMICU, ralph drivers) can spawn without owning the SDK code themselves.
+
+#### What's actually inside Hopsken (5,159 LOC)
+
+| Component | Role | LOC |
+|---|---|---|
+| `agent-runner.ts:240-345` | `createAgentSession` wrapper, prompt assembly, lifecycle | ~250 |
+| `ui/conversation-viewer.ts` | Modal `ctx.ui.custom` overlay, live `session.subscribe` re-render, scroll keys | 243 |
+| `ui/agent-widget.ts` | Always-visible tree of running agents, Braille spinners, token counts | 488 |
+| `cross-extension-rpc.ts` | `pi.events`-based RPC, scoped reply channels, `PROTOCOL_VERSION` gate | 95 |
+| `index.ts` | Slash commands (`/agents`), 3 default agents, agent registry, memory, group-join | 1,671 |
+| The other ~2,400 LOC | steering, resume, worktree, message-renderer, settings, `.pi/agents/*.md` discovery | — |
+
+The reason "build our own minimal in-process subagent" cost ~700 LOC was that ~400 of those LOC are the UI patterns that *are* the value. The rest is unavoidable wiring. After surveying HazAT, even that 700 is dropped — HazAT covers a different pattern that's better for evolve, and Hopsken covers the in-process pattern.
+
+---
+
+### Pattern 4 — Multiplexer pane per subagent (cmux/tmux/zellij/WezTerm)
+
+**Used by**: HazAT/pi-interactive-subagents only (8,227 LOC including tests).
+
+#### How it works
 
 ```ts
-// Spawn a new mux pane (cmux/tmux/zellij/wezterm) running `pi <args>`
-muxBackend.createPane({ command: ["pi", "-p", task, ...flags], title: agentName });
-// Track liveness via child-written runtime snapshot (not session-file growth)
-const activity: SubagentActivityState = readActivitySnapshot(sessionDir);
-// Steer result back to parent on child completion
-pi.sendMessage({ customType: "subagent_result", details, deliverAs: "followUp", triggerTurn: true });
+// Detect which multiplexer the user is running pi inside
+const mux: MuxBackend = detectMux();   // cmux | tmux | zellij | wezterm | none
+
+// Spawn each subagent in its own mux pane
+const paneId = await mux.createPane({
+  command: ["pi", "-p", task, "--session", sessionPath],
+  title: `subagent: ${name}`,
+  splitDirection: "right",     // or "down" — user-configurable
+});
+
+// Track liveness via runtime snapshots written by the child
+//   ~/.pi/sessions/<id>/runtime-state.json
+// Child writes: { status: "active"|"waiting"|"stalled"|"running", lastTurnAt, ... }
+// Parent polls this file; correlates to its widget
+const activity = await readActivitySnapshot(sessionDir);
+
+// On child completion, steer result back to parent
+pi.sendMessage({
+  customType: "subagent_result",
+  details: { name, finalOutput, usage, exitCode },
+  deliverAs: "followUp",
+  triggerTurn: true,
+});
 ```
 
-Each subagent gets a **first-class terminal pane** the user can switch into via the multiplexer's native keybinds (cmux Ctrl+\\, tmux Ctrl+B+arrows, zellij Alt+arrows, etc.). Status flows back to parent via runtime activity snapshots written by the child to a known path.
+#### What you get
 
-**Used by**: HazAT/pi-interactive-subagents only.
+- **Each subagent is a real, full Pi session in a real terminal pane.** Full TUI. Full transcript. Fully interactive — you can type into the child if you want.
+- **True parallel inspection.** Mux split = N children visible simultaneously. cmux's `Ctrl+\` (or tmux's prefix+arrows, zellij's Alt+arrows) cycles between them.
+- **Native multiplexer keybinds.** This is what users already know. No new UX to learn.
+- **No truncation anywhere.** It's a real pane — output is whatever the user's terminal shows.
+- **Async non-blocking by default.** `subagent()` tool returns immediately; parent keeps working. Result lands in parent context as a system-reminder when child finishes.
+- **Liveness is observable without a session-file diff.** The runtime-state snapshot pattern means parent sees `starting`/`active`/`waiting`/`stalled`/`running` cleanly.
+
+#### What you give up
+
+- **Hard dependency on a multiplexer.** If the user runs `pi` from a plain terminal, this pattern degrades. HazAT detects and falls back, but the differentiated UX is lost.
+- **Pane management is the user's problem.** Parent can spawn but doesn't own the pane lifecycle the way Hopsken owns its modal. Closing the pane mid-run is a foot-gun.
+- **No automatic re-rendering inside parent's TUI.** The widget shows status; the *content* lives in the other pane. Parent can't quote child output back into its own message log without reading the session file.
+- **Process isolation but more of it.** Each child is a separate `pi` subprocess. Same memory profile as Pattern 1 plus the multiplexer overhead.
+
+#### When this pattern wins
+
+- **Multi-candidate comparison (DACMICU evolve's core need).** N candidates → N panes → eyes can compare in real time. **No other pattern does this.**
+- **When the user already lives in cmux/tmux.** The integration feels native; nothing new to install or configure beyond the extension.
+- **When children need full interactivity for steering.** Type directly into the child pane. No "steer tool" indirection.
+- **When the parent shouldn't block.** Async non-blocking is the only mode; you can't accidentally write a parent that hangs waiting for a child.
+
+#### Why this is the only Pi extension matching opencode's `<leader>+down` UX
+
+Opencode treats sessions as first-class navigable entities. You can `<leader>+down` into a child, `right`/`left` between siblings. But opencode still shows **one** session full-screen at a time — there's no tab/pane mechanism in the opencode TUI itself.
+
+HazAT externalizes the navigation problem to the multiplexer. The mux is the "window manager" — it has tabs, splits, zoom, copy-mode, scrollback, all already. Pi just needs to spawn a pane and know which session ID it owns. **For parallel inspection, this is strictly more capable than opencode**: opencode forces full-screen cycling; HazAT lets you split-screen four candidates at once.
+
+The trade is the multiplexer dependency. For DACMICU evolve's user (already comfortable with cmux/tmux), that's not a real cost.
+
+---
+
+### Cross-pattern comparison
+
+| Dimension | Pattern 1 (subprocess+JSON) | Pattern 2 (subprocess+RPC) | Pattern 3 (in-process) | Pattern 4 (mux pane) |
+|---|---|---|---|---|
+| Spawn cost | ~200-500ms | ~200-500ms | ~0 | ~200-500ms + mux pane |
+| Process isolation | full | full | none | full |
+| Mid-run steer/abort | no (SIGTERM only) | yes (RPC) | yes (method call) | yes (write to pane) |
+| Live event stream | poll stdout | RPC notifications | `session.subscribe` | runtime snapshot file + pane |
+| Parallel inspection | no | no | no (modal) | **yes (mux split)** |
+| Tool result truncation in viewer | extension's choice | extension's choice | Hopsken truncates 500ch | none (real pane) |
+| User-interactive child | no | no | no | **yes** |
+| LOC for minimum viable | ~150 | ~1,300 | ~3,000 | ~5,000 |
+| LOC for production-grade | ~20,000 (nicobailon) | n/a | ~5,000 (Hopsken) | ~8,000 (HazAT) |
+| SDK semver risk | low | medium (`--mode rpc` schema) | **high** (`createAgentSession`) | low |
+| Best for | one-shot fan-out, isolation | long-lived steerable child | live oversight, low-overhead | parallel candidate comparison |
+
+### Why DACMICU ends up with two providers, not one
+
+The earlier framing was "pick one provider, use it everywhere." That's wrong because **ralph's inspection needs and evolve's inspection needs are categorically different**.
+
+| Consumer | Inspection mode | Right pattern | Right provider |
+|---|---|---|---|
+| `@pi-dacmicu/ralph` | Mostly background; occasional check on a stuck iteration; one child at a time | **Pattern 3** (in-process modal) | **Hopsken** (or tintinweb superset) |
+| `@pi-dacmicu/evolve` | Foreground analytical; compare N candidates side-by-side; "why did B diverge from A?" | **Pattern 4** (mux pane per candidate) | **HazAT** |
+| Future programmatic embedding | Library-style, host extension owns the UI | **Pattern 1** wrapped as library | **cmf/pi-subagent** |
+
+If evolve depends on Hopsken alone, the user hits the 500-char truncation wall the moment they want to inspect why candidate B diverged at turn 14. That truncation isn't a UX nicety — it kills the whole point of evolve.
+
+If ralph depends on HazAT alone, the user is forced to run pi inside a multiplexer just to use the loop. That's user-hostile for the easy case.
+
+Hence per-consumer provider selection. The cost is one more soft-dep entry in each consumer package. The win is each consumer gets the inspection model it actually needs.
 
 ## Visibility & navigability comparison
 
