@@ -7,7 +7,7 @@ sources:
   - https://github.com/anomalyco/opencode/pull/20074
   - https://github.com/micuintus/opencode/tree/feat/DACMICU_20018
 tags: [dacmicu, agent-loop, todo, subagent, loop-variants]
-updated: 2026-05-08
+updated: 2026-05-10
 see_also:
   - "../../MetaHarness/llm-wiki/proposals/mats.md"
   - "../../MetaHarness/llm-wiki/systems/meta-harness.md"
@@ -56,14 +56,44 @@ The lightweight in-session loop is implemented entirely from existing Pi extensi
 
 Not a subagent. Not a subprocess. Not autonomous — the LLM still drives every turn; the driver only schedules *when* the next turn fires.
 
+## Deterministic TODO loop — the core DACMICU pattern
+
+The TODO system is not just a list tool. It is the **state machine** that the deterministic loop drives:
+
+```
+User asks for a complex task
+    ↓
+LLM creates TODO list via manage_todo_list tool
+    ↓
+agent_end fires → DACMICU loop driver:
+    1. CHECK  → Scan session entries, read current TODO state
+    2. UPDATE → Reassess: are items still valid? Reorder? Merge?
+    3. WORK   → If items remain, inject next item as followUp
+    ↓
+LLM works that item, marks done via manage_todo_list
+    ↓
+agent_end fires → repeat CHECK → UPDATE → WORK
+    ↓
+All items done → loop terminates
+```
+
+**Key design decisions:**
+
+- **Loop driver runs on `agent_end`**, not as a tool the LLM calls. The LLM works items; the loop decides when to continue.
+- **Reassessment (UPDATE) is load-bearing.** Before working the next item, the loop injects a bounded validation turn: "Is this still the highest-priority item? Has context changed?" This prevents blindly working stale TODOs.
+- **TODO state is passive.** The loop reads state; the LLM mutates it via the standard tool. No DAG, no auto-reminders, no active-task heuristics — those fight loop-driver ownership.
+- **Session-entry persistence** (tool-result `details`) branches with `/fork` automatically. File-backed storage does not.
+
+See [TODO base decision](#todo-base-tintinwebpi-manage-todo-list) below for why `tintinweb/pi-manage-todo-list` is the right primitive.
+
 ## Umbrella framing (six modular packages)
 
 DACMICU is the **umbrella primitive** unifying four downstream concerns, plus two infrastructural ones. Implementation is a six-package monorepo (see [modular-architecture](modular-architecture.md)) sharing one runtime library:
 
 1. **Ralph Loop** (`@pi-dacmicu/ralph`) — dispatches Variant A (in-session) or Variant B (subagent-per-iteration) per task / user request. Variant B consumes a third-party subagent provider via `pi.events` RPC.
 2. **FABRIC-style composition** (`@pi-dacmicu/fabric`) — agent as a stage in a Unix pipeline; bash-callback infrastructure. Independent of the loop primitive (see Correction below).
-3. **TODO system base** (`@pi-dacmicu/todo`) — structured TODO list as the loop's natural state machine. Variant A consumer. Hard-depends on `@pi-dacmicu/base`.
-4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. Variant B consumer (each candidate evaluated in isolation). **No validated upstream prototype exists.** A 510-LOC draft was written during DACMICU planning (`examples/extensions/pi-evolve.ts`, untracked at repo root, unverified) — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — unrelated to MATS evolution. Build from scratch or adapt patterns from `mitsuhiko/agent-stuff/extensions/loop.ts`.
+3. **TODO system base** (`@pi-dacmicu/todo`) — deterministic outer loop on `manage_todo_list` state. Variant A consumer. Hard-depends on `@pi-dacmicu/base`. See [deterministic TODO loop](#deterministic-todo-loop--the-core-dacmicu-pattern) above.
+4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. Variant B consumer (each candidate evaluated in isolation). **No validated upstream prototype exists.** A 510-LOC draft was written during DACMICU planning (`examples/extensions/pi-evolve.ts`, untracked at repo root, unverified) — see [verification audit](archive/research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — unrelated to MATS evolution. Build from scratch or adapt patterns from `mitsuhiko/agent-stuff/extensions/loop.ts`.
 5. **Loop primitive** (`@pi-dacmicu/base`) — `agent_end`-driven scheduler with compaction preservation, abort detection, and breakout tool. Substrate-agnostic (Variant A or B). Exports the runtime as a library for the four consumers above.
 6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08.** Standing on the existing Pi subagent ecosystem. **v1 simplification: depend only on `tintinweb/pi-subagents`** (which exposes Claude Code-idiomatic `Agent`/`get_subagent_result`/`steer_subagent` tools — `Agent` is the canonical name; `Task` is a doc alias. LLM training-known shapes, free prompt tokens). No multi-mode `delegate()` API; the LLM uses tintinweb's `Agent` tool directly. Variant A (inline) is default; Variant B (subagent) opt-in via tintinweb's tools. `HazAT/pi-interactive-subagents` integration deferred to v1.x.
 
@@ -127,6 +157,26 @@ That's it. No bundled subagent code. `Hopsken/pi-subagents` (installed separatel
 
 If integration friction proves too high (e.g. Hopsken's RPC contract is too opinionated for our use case), the fallback is a thin `@pi-dacmicu/subagent` that wraps `createAgentSession` directly — ~400 LOC, no UI layer, no cross-extension RPC. Visibility & navigability would be lost in that path. Avoid unless forced.
 
+## TODO base: `tintinweb/pi-manage-todo-list`
+
+**Decision:** `@pi-dacmicu/todo` peer-depends on `tintinweb/pi-manage-todo-list`. The loop driver reads its state via session-entry scanning; the LLM mutates state via the idiomatic `manage_todo_list` tool.
+
+### Why not `edxeth/pi-tasks` (the strongest full task system in Pi)
+
+`edxeth/pi-tasks` has better visualization (stats, 3-view widget, active-task tracking) but is a **poor foundation for a deterministic loop**:
+
+| Concern | `tintinweb/pi-manage-todo-list` | `edxeth/pi-tasks` |
+|---|---|---|
+| **Storage** | Session-entry `details` (branches with `/fork` for free) | File-backed (`~/.pi/tasks/` — branches silently overwrite shared files) |
+| **Tool surface** | 1 tool (`manage_todo_list`) | 5 tools (`task_create/list/get/update/batch`) — more for LLM to misuse |
+| **Dependency DAG** | **None** — flat list, loop owns ordering | Built-in `blocks`/`blockedBy` — LLM can bypass loop's ordering |
+| **Opinionated behavior** | None — pure state primitive | Stats, reminders, active-task heuristics, system-policy injection — fights loop driver |
+| **Read from loop driver** | Scan `ctx.sessionManager.getBranch()` for tool results | Must read JSON files, understand format, handle locks |
+
+The dealbreaker is the **dependency DAG**: if the LLM can express "task B blocks task A," it will use that to drive ordering instead of the loop's reassessment step. The DAG and the loop driver compete for control of "what's next."
+
+**Use `edxeth/pi-tasks`** when you want a full Claude Code-style task experience in Pi. **Use `tintinweb/pi-manage-todo-list`** when you want a passive state primitive for a deterministic loop.
+
 ## Correction: FABRIC is not a DACMICU prerequisite
 
 Earlier framing implied DACMICU needed the `pi` CLI / Unix-socket infrastructure to reach opencode parity. That conflated two distinct mechanisms:
@@ -160,6 +210,7 @@ FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/
 - [../implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — closes the mid-step recursive judgment gap
 - [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — current MATS-style consumer of the umbrella
 - [ecosystem/loop-extensions](../ecosystem/loop-extensions.md) — Ralph/until-done extensions that validate the port architecture
+- [ecosystem/todo-visualizations](../ecosystem/todo-visualizations.md) — TODO ecosystem survey, including edxeth/pi-tasks assessment
 - [ecosystem/claude-code-loop](../ecosystem/claude-code-loop.md) — Claude Code's `/loop` (cron, different problem)
 - [architecture/loop-internals](../architecture/loop-internals.md) — the loop that runs the subagent
 - [comparisons/loop-architectures](../comparisons/loop-architectures.md) — why Pi is friendlier than opencode2 for this
@@ -181,6 +232,7 @@ This page is a **living document**. For the full research history (decision proc
 - [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
 
 **Significant revisions**:
+- 2026-05-10: Added deterministic TODO loop section (check → update → work). Added TODO base decision (tintinweb/pi-manage-todo-list vs edxeth/pi-tasks).
 - 2026-05-10: Corrected pi-evolve provenance (local draft, not upstream reference). Removed inline research references.
 - 2026-05-08: Dropped `@pi-dacmicu/subagent` (reuse tintinweb instead). Added npm rebrand note.
 - 2026-05-08: Refined Variant A vs Variant B framing (both first-class, not just Variant A).
