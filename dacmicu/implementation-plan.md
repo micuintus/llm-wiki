@@ -25,7 +25,9 @@ see_also:
 
 # DACMICU implementation plan for Pi
 
-> **Superseded.** The single-extension design previously committed here has been replaced by the modular six-package monorepo described in [modular-architecture](modular-architecture.md). This page now serves as the build sequencing plan against that architecture.
+> **WARNING: This plan has been critically reviewed.** See [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) for a deliberately hostile reading that challenges every load-bearing assumption. Key findings: "deterministic" is overstated; reassessment step is unvalidated; evolve should be removed from v1; the "2-3 days" estimate is 3-5× too low. This page preserves the original plan for reference; consider the critique before building.
+
+> The single-extension design previously committed here has been replaced by the modular six-package monorepo described in [modular-architecture](modular-architecture.md). This page now serves as the build sequencing plan against that architecture.
 
 ## Build sequence
 
@@ -113,20 +115,28 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 ## Estimated effort
 
-**Updated evening 5**: total ~1,400 LOC across five packages (subagent dropped). Roughly 2-3 days for a proficient Pi extension developer. **Note**: earlier drafts cited `pi-evolve.ts` as a reference — this is a local draft, not upstream code. Use `mitsuhiko/agent-stuff/extensions/loop.ts` as the canonical production reference for the driver pattern.
+> **CRITICAL REVIEW FINDING**: The original "2-3 days" estimate is 3-5× too low. See [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) § 10 for the full critique. The revised honest estimate is below.
 
-| Package | LOC | Notes |
-|---|---|---|
-| base | ~200 | `attachLoopDriver` orchestrator + `signal_loop_success` tool + `session_before_compact` preservation. Up from ~150 to account for proper testing scaffolding. |
-| todo | ~250 | Lifts most logic from `examples/extensions/todo.ts` (297 LOC verified) and adds the loop driver + reassessment step + snapshot renderer. |
-| ~~subagent~~ | — | **Dropped evening 2.** `tintinweb/pi-subagents` (soft-dep) handles this. |
-| fabric | ~250 | Socket server + bash interceptor + system-prompt fragment + 50-LOC CLI |
-| ralph | ~200 | `/ralph` command, breakout tool, optional tintinweb subagent dispatch via `subagents:rpc:spawn` RPC, fallback to inline. |
-| evolve | ~600 | New build — no validated upstream prototype. A 510-LOC draft exists locally (untracked, unverified) with the correct hook patterns but is not tested or production-ready. Design tools, ledger, and git logic from scratch; consume base's `attachLoopDriver()`; add ~50 LOC JSONL transcript writer for candidate inspection (works around Hopsken viewer's 500-char truncation). |
-| **Total owned** | **~1,500** | Plus ~10 LOC `@pi-dacmicu/all` meta-package |
-| Reused via soft-deps | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. ~4.4× leverage. |
+**Original plan**: ~1,500 LOC across five packages. Claimed 2-3 days.
 
-> **Note on `examples/extensions/subagent/index.ts`**: actual LOC is **987**, not the ~700 cited in earlier wiki. Order-of-magnitude unchanged but reference for own subagent build (if ever needed) was understated.
+**Revised honest estimate**: ~400-600 LOC for a minimal v1 (base + todo + ralph, no evolve/fabric). **1-2 weeks** for a proficient Pi extension developer, including integration testing, edge cases, and documentation.
+
+| Package | Original LOC | Revised LOC | Revised Notes |
+|---|---|---|---|
+| base | ~200 | ~100 | Internal module (not standalone package). `attachLoopDriver` + `signal_loop_success` + compaction preservation. |
+| todo | ~250 | ~200 | Loop driver + widget + `/todo-loop`. **Reassessment optional (default: off)** — reduces complexity and token cost. |
+| ~~subagent~~ | — | — | Dropped. |
+| fabric | ~250 | — | **Deferred** — independent capability, not v1 requirement. |
+| ralph | ~200 | ~100 | Thin wrapper/configurator. Consider depending on existing ecosystem extensions instead of rebuilding. |
+| evolve | ~600 | — | **Removed from v1** — unvalidated requirement, no upstream prototype, highest risk. |
+| **Total v1** | **~1,500** | **~400** | Plus ~10 LOC meta-package. |
+| Reused via soft-deps | ~6,600 | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. |
+
+**Why the original estimate was wrong**: It assumed "lift existing code" would be fast. But the existing code is either unverified drafts (pi-evolve.ts), demo-quality examples (todo.ts has no widget/loop driver), or ecosystem extensions with different semantics (mitsuhiko's loop has no reassessment). Integration testing, `/fork`/`/compact`/`/reload` edge cases, and real TUI testing consume most of the time — not the initial code writing.
+
+**Build priority**: `base` → `todo` → integration tests → `ralph` (if time). Skip `evolve` and `fabric` for v1.
+
+> **Note on `examples/extensions/subagent/index.ts`**: actual LOC is **987**, not the ~700 cited in earlier wiki.
 
 ## Cross-references
 

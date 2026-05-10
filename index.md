@@ -32,8 +32,9 @@ Catalog of compiled pages for the pi-mono project.
 - [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-08*
 
 ### Archive — research history
-Full decision trail, verification passes, corrections, scale-down explorations:
-- [Latest audit (2026-05-10)](dacmicu/archive/research-2026-05-10-comprehensive-verification-audit.md) — 70 claims checked, 17 false. pi-evolve provenance correction.
+Full decision trail, verification passes, corrections, scale-down explorations, critical reviews:
+- **[Critical Plan Review (2026-05-10)](dacmicu/archive/research-2026-05-10-critical-plan-review.md)** — Deliberately hostile reading of the entire plan. 11 assumptions challenged. Key findings: "deterministic" overstated; reassessment unvalidated; evolve should be removed from v1; estimate 3-5× too low. **Read this before building.**
+- [Verification Audit (2026-05-10)](dacmicu/archive/research-2026-05-10-comprehensive-verification-audit.md) — 70 claims checked, 17 false. pi-evolve provenance correction.
 - [archive/](dacmicu/archive/) — All sessions (evening 2–6) and prior audits.
 
 ## Concepts

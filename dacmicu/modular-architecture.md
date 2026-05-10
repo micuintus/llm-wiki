@@ -28,7 +28,11 @@ see_also:
 
 # DACMICU modular architecture
 
+> **WARNING: This architecture has been critically reviewed.** See [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) for challenges to every load-bearing assumption. Key findings: the 5-package structure is over-engineered for v1; `evolve` should be removed; `base` is better as an internal module than a standalone package; the "2-3 days" estimate is 3-5× too low.
+
 Supersedes the single-extension decision in [implementation-plan](implementation-plan.md). DACMICU ships as a modular monorepo of six small Pi packages with a small shared runtime library. The umbrella framing from [concept](concept.md) survives as architecture; the deliverable is six focused, composable packages.
+
+> **Post-critique v1 scope**: base (internal module) + todo + ralph only. ~400 LOC. 1-2 weeks. See implementation-plan for revised estimates.
 
 ## The six packages
 
