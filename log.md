@@ -1,6 +1,46 @@
 # Wiki Log
 
-## [2026-05-08 evening 2] simplification | Hopsken=tintinweb correction; v1 = inline + tintinweb only; idiomatic APIs (Claude Code Task / Copilot manage_todo_list)
+## [2026-05-08 evening 4] comprehensive audit | ALL 46 assumptions verified; 4 false, 1 unverified, 41 confirmed
+- User requested in-depth review of ALL DACMICU plans and assumptions. Conducted systematic verification across 8 categories against primary sources (live source code, GitHub API, npm registry, Pi docs).
+- **46 assumptions checked total**: 41 confirmed, 4 false, 1 unverified.
+- **Critical false assumptions found**:
+  1. **tmustier/pi-ralph-wiggum has NO pause/resume or max-iteration cap** — wiki claimed these patterns exist; entire repo searched, none found. tmustier is a basic auto-continue loop only.
+  2. **davebcn87/pi-autoresearch has NO setWidget factory form** — wiki claimed this as the production reference for reactive widgets at lines 1294-1380; entire file searched, no widget code at all. Uses `ctx.ui.notify` only.
+  3. `latency-variable/pi-auto-continue` — claimed `setTimeout(..., 0)` defer trick; repo never cloned/surveyed, completely unverified.
+  4. `kostyay/agent-stuff` path was `extensions/loop.ts`, not `pi-extensions/loop.ts` as claimed in implementation-plan.md.
+- **All Pi extension API surface assumptions confirmed** (11/11): `agent_end`, `sendMessage(triggerTurn, followUp)`, `hasPendingMessages`, `session_before_compact`, `before_agent_start`, `session_start`/`session_tree`, `registerTool`, `registerCommand`, `events.emit/on`, `setWidget`, `registerMessageRenderer`, `pi.exec`, `modelRegistry`, `tool_call` mutation.
+- **All TODO system assumptions confirmed** (5/5): Copilot-shape tool, session persistence via `details`, `getBranch()` reconstruction, deterministic outer loop layering, `before_agent_start` injection.
+- **All subagent assumptions confirmed** (6/7): tintinweb `Agent`/`get_subagent_result`/`steer_subagent` tools, `subagents:rpc:spawn` RPC contract with `PROTOCOL_VERSION=2`, `createAgentSession` in SDK, 500-char truncation at lines 209/221, `pi.events` bus. One unverified: fallback degradation (design decision, needs test).
+- **All monorepo/packaging assumptions confirmed** (5/5): Strategy A avoids module-isolation, `bundledDependencies` for cross-package sharing, `peerDependencies` only for Pi core, separate module roots, `pi config` granularity.
+- **All NPM rebrand assumptions confirmed** (4/4): `@mariozechner/*` → `@earendil-works/*`, both scopes published, tintinweb pins legacy, alias may retire.
+- **All FABRIC assumptions confirmed** (3/3): `tool_call` input mutation, Unix socket server, bash callback round-trip.
+- **8 runtime tests identified** before v1 ship: `/compact` survival, `/fork` survival, multiple `before_agent_start` chaining, cross-extension RPC, `agent_end` handler ordering, `triggerTurn` race with user typing, socket `/reload` survival, tintinweb `Agent` tool integration.
+- Verified Pi primitives reference table: all 15 primitives confirmed against source.
+- **Verified v1 architecture**: ~1,400 LOC owned, ~6,600 LOC reused, ~4.7× leverage.
+- Wiki updates:
+  - New: `dacmicu/research-2026-05-08-evening4-comprehensive-audit.md` — full 46-assumption audit with evidence, 4 corrections, 8 test requirements.
+  - `index.md` — added evening 3 and evening 4 entries.
+
+## [2026-05-08 evening 3] verification pass | 6 corrections; new pi-rebrand finding (`@mariozechner/*` → `@earendil-works/*`)
+- User asked for in-depth verification of all claims accumulated across morning + evening 1 + evening 2.
+- Verification methodology: re-read source files end-to-end (not grep snippets); live GitHub API (not search-engine cache); live npm registry; cross-check against authoritative Claude Code docs.
+- **Confirmed**: Hopsken = tintinweb (snapshot), tintinweb tool names match Claude Code `Agent`/`get_subagent_result`/`steer_subagent`, ConversationViewer 500-char truncation real, HazAT multiplexer + activity-snapshot patterns real, popododo state-machine + transition-guards + before_agent_start deferred compaction all real, Pi SDK exports all present, LOC numbers match (against the snapshot version we surveyed).
+- **Corrections**:
+  1. Claude Code's tool is `Agent` (canonical) — `Task` is a doc-alias only. tintinweb uses canonical name.
+  2. tintinweb's `manage_todo_list` mirrors Copilot's shape verbatim, NOT Claude Code's `TodoWrite`. They are different idioms (different field names, status values, operation pattern). Both training-known but not equivalent.
+  3. `cmf/pi-subagent`: 0 stars / 0 forks / 1 commit / never published to npm. NOT production-grade. Earlier wiki ranking it alongside tintinweb/HazAT was wrong. Now downgraded to "experimental, pattern reference only".
+  4. HazAT activity phases: `starting`/`active`/`waiting`/`done` (4 phases). Earlier claim of 5 phases including `stalled`/`running` was wrong.
+  5. ConversationViewer truncation line numbers: actual lines 209 and 221 (not 175 and 191). Functionality unchanged.
+  6. Star counts updated to live API values (small drift since earlier survey, no ranking change).
+- **MAJOR NEW FINDING**: Pi was rebranded from `@mariozechner/*` to `@earendil-works/*` npm scope (commits `551385e4`, `3e5ad67e`, `5e1e4c3c`, `dacb7eaa`, `de8c9475`, `6d2d03dc`). Both scopes currently published — `@mariozechner/pi-coding-agent` 270 versions latest 0.73.1; `@earendil-works/pi-coding-agent` 1 version, 0.74.0 created 2026-05-07. **tintinweb (and likely all major ecosystem packages) still pin legacy `@mariozechner/*`** — at risk of break when legacy alias retired. DACMICU `@pi-dacmicu/*` peer-deps must use `@earendil-works/pi-coding-agent`. Plan: monitor tintinweb for release that updates peer-deps; install both scopes side-by-side at user `~/.pi/agent/` during transition.
+- Wiki updates:
+  - New: `dacmicu/research-2026-05-08-evening3-verification.md` — full verification log with confirmed facts, 6 corrections with references, npm-scope rebrand finding.
+  - `dacmicu/concept.md` — package #6 framing updated with `Agent` (not `Task`) and npm-scope rebrand action item.
+  - `ecosystem/subagents.md` — project health table updated to live API values; cmf entry corrected to "experimental"; truncation line numbers updated; HazAT phase list corrected.
+  - `ecosystem/todo-visualizations.md` — corrected the "Copilot ≈ Claude Code TodoWrite" claim (they are different shapes).
+  - `index.md` — entries updated.
+
+## [2026-05-08 evening 2] simplification | Hopsken=tintinweb correction; v1 = inline + tintinweb only; idiomatic APIs (Claude Code Agent / Copilot manage_todo_list)
 - **Critical correction**: `Hopsken/pi-subagents` IS `tintinweb/pi-subagents` (private mirror, package.json says `@tintinweb/pi-subagents`, tintinweb is author/repo URL). Earlier wiki framing of two distinct packages with "5159 vs 6082, superset" comparison was wrong — same package, different snapshots. Canonical: tintinweb (271 stars, 27 releases, last push 2026-05-07).
 - **Project health snapshot** gathered for all candidates: nicobailon (1,289⭐), HazAT (394⭐ healthy), tintinweb (271⭐ healthy), tintinweb/pi-manage-todo-list (16⭐ small but focused), popododo (15⭐ single-dev stale 2 months — ruled out as dependency).
 - **Idiomatic LLM-known API findings**: tintinweb/pi-subagents exposes Claude Code's `Task`/`get_subagent_result`/`steer_subagent` tool names verbatim; tintinweb/pi-manage-todo-list mirrors VSCode Copilot's `manage_todo_list` shape verbatim. Both are LLM training-known shapes — free prompt tokens. Strongest argument for reuse: inventing DACMICU-specific shapes burns prompt tokens explaining non-standard APIs.
