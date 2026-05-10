@@ -12,7 +12,25 @@
 
 Earlier wiki/research cited `github.com/badlogic/pi-evolve` with "7 stars, 1 fork, last push 2026-05-08, 510 LOC". Verified today via live GitHub API: that URL **returns HTTP 404**. `badlogic` (Mario Zechner) does exist on GitHub with 256 public repos including pi-share-hf, pi-diff-review, pi-skills, pi-doom, etc. — but no `pi-evolve` anywhere in his 100 most-recent pushes. The "verified stats" were search-engine-cached snippets treated as primary source — fabricated, not verified.
 
-### Failure 3: npm package is something else entirely
+### Failure 3 (provenance found): the local 510-LOC file is a DACMICU draft prototype written in an earlier session
+
+User suggested checking whether I created the file myself in an earlier session. **Confirmed.** Evidence:
+
+- File created `2026-05-07 10:51:40`, modified six minutes later — single-pass authoring consistent with one session
+- Imports `@mariozechner/pi-coding-agent` (pre-rebrand scope; rebrand was the same day)
+- Header comment uses DACMICU planning vocabulary verbatim: "MATS-style", "selection ledger", "agent_end → auto-queues", "signal_evolve_success", "init_experiment / run_experiment / log_experiment"
+- All identifiers (`EvolveState`, `LEDGER_FILE = "selection.md"`, `signal_evolve_success`) match terms minted in `dacmicu/concept.md` and adjacent docs, not anything in upstream Pi or the published `pi-evolve` package
+- The `Repository: https://github.com/badlogic/pi-evolve` line in the file header is aspirational/placeholder — not a real source URL
+
+**Implication**: this is our own draft prototype, not external code. Across multiple sessions the wiki cited it as if it were upstream Pi or a published extension. Classic confabulation loop: file authored in one session → forgot it was mine → cited as external in subsequent sessions → planned around it as if it were leverage.
+
+**Real status**:
+- 510 LOC of DACMICU draft code, not committed anywhere
+- Counts toward DACMICU's owned LOC budget, not against it
+- Does NOT validate the MATS evolution loop pattern as a real working extension — it's untested code
+- Has nothing to do with the npm `pi-evolve` package (Dunya Kirkali's 143-LOC brainstorming tool)
+
+### Failure 4: npm package is something else entirely
 
 Verified by `npm pack pi-evolve@0.1.0` and inspecting tarball contents:
 
@@ -27,12 +45,13 @@ The local 510-LOC file's provenance is **completely unknown**. It's not the npm 
 
 ### Implications for the DACMICU plan
 
-The "evolve" downstream concern in the umbrella framing was built on a conflation of three different things treated as one:
-1. A 510-LOC local file of unknown origin (claimed in-tree, not in-tree; claimed from `badlogic/pi-evolve`, that repo doesn't exist)
-2. A dead GitHub URL with fabricated stars/push-date metadata
-3. An npm package that does something completely different (brainstorming siblings, not MATS evolution)
+The "evolve" downstream concern in the umbrella framing was built on a conflation of FOUR different things treated as one:
+1. A 510-LOC local file authored by me in an earlier DACMICU session — DRAFT, NEVER TESTED, NEVER COMMITTED
+2. A claim that file is "in-tree in pi-mono" — wrong; untracked at repo root
+3. A dead GitHub URL `github.com/badlogic/pi-evolve` with fabricated stars/push-date metadata
+4. An npm package `pi-evolve@0.1.0` that does something completely different (143-LOC brainstorming siblings tool by Dunya Kirkali, not MATS evolution)
 
-Anything in the wiki citing "pi-evolve" needs re-examination. The session-6 scale-down draft (`research-2026-05-08-evening6-radical-scale-down.md`) was written assuming option 1 above is real and stable; that assumption no longer holds.
+Anything in the wiki citing "pi-evolve" or "pi-evolve foundation" needs re-examination. The session-6 scale-down draft (`research-2026-05-08-evening6-radical-scale-down.md`) was written assuming "pi-evolve already exists in-tree at 510 LOC = 0 LOC owned by us"; that's wrong. The 510 LOC IS owned by us (it's a draft we wrote), and it's not validated upstream code.
 
 ### What's still safe
 
