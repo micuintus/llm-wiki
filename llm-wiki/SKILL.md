@@ -101,6 +101,72 @@ or to document a correction to prior analysis, see
 `references/synthesis-and-archive.md` (also covers the
 `### Correction:` pattern in `references/quality.md`).
 
+## Navigation and discoverability
+
+A wiki that only machines can navigate compounds poorly. Apply these
+patterns during compile so humans can use it too.
+
+### README as portal
+
+The repository `README.md` is the first thing a visitor sees. Do not
+make it a stub that dumps them to `index.md`. It should contain:
+
+- **"I want to…" decision table.** Map the 5–8 most common goals to
+the right page in one glance.
+- **Quick picks.** 3 curated starting points for newcomers — the
+extensions or patterns that multiple curators independently recommend.
+- **Full browse index.** Same categories as `index.md`, with inline
+descriptions, so GitHub visitors don't need to click through.
+
+### Inline table of contents
+
+Any compiled page >200 lines or with >6 `##` sections gets a
+`## Contents` block immediately after the `h1`. Link to section
+anchors using the slugified heading text:
+
+```markdown
+## Contents
+
+- [Section name](#section-name)
+- [Another section](#another-section--with-details)
+```
+
+This costs ~10 lines and saves scrolling on long surveys.
+
+### Visual anchors on index pages
+
+Category headers in `index.md`-style browse pages get emoji prefixes
+for at-a-glance scanning:
+
+| Emoji | Meaning |
+|---|---|
+| 🔁 | Iteration, loops, agents |
+| ✅ | Task tracking, planning |
+| 🎨 | TUI, themes, visual |
+| 🔧 | Tool behavior, editing |
+| 🌐 | Web, search, information |
+| 🧠 | Knowledge, skills, memory |
+| 📱 | Remote, mobile, access |
+| 🔌 | Integrations, providers, auth |
+| 📋 | References, catalogs, methods |
+| 🚧 | Gaps, stubs, not yet surveyed |
+
+Pick a consistent mapping and document it in `SCHEMA.md`.
+
+### See also completeness
+
+Every compiled page ends with `## See also` linking to 2–4 related
+pages. Reference pages (`references/`) and `index.md` are not exempt.
+If a page type genuinely has no relations, write `## See also` with an
+explanation — the section heading itself is a consistency signal.
+
+### Decision-support tables
+
+Survey pages (the core value of this wiki format) should end with a
+**picking table**: "If you want X, use Y" with a one-line why. This
+is the payoff for reading the survey — don't make the user synthesize
+themselves.
+
 ## Lint
 
 Two categories with different authority levels.
