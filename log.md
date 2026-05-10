@@ -162,7 +162,7 @@ Anything else cited as "verified" with star counts, fork counts, push dates, or 
 - **All FABRIC assumptions confirmed** (3/3): `tool_call` input mutation, Unix socket server, bash callback round-trip.
 - **8 runtime tests identified** before v1 ship: `/compact` survival, `/fork` survival, multiple `before_agent_start` chaining, cross-extension RPC, `agent_end` handler ordering, `triggerTurn` race with user typing, socket `/reload` survival, tintinweb `Agent` tool integration.
 - Verified Pi primitives reference table: all 15 primitives confirmed against source.
-- **Verified v1 architecture**: ~1,400 LOC owned, ~6,600 LOC reused, ~4.7× leverage.
+- **Verified v1 architecture**: ~2,100 LOC owned, ~5,723 LOC reused, ~2.7× leverage. (Corrected from ~1,400/~6,600 after deep review found TODO state compaction bug, pi-callback deadlock, and evolve requires Variant B rewrite.)
 - Wiki updates:
   - New: `dacmicu/research-2026-05-08-evening4-comprehensive-audit.md` — full 46-assumption audit with evidence, 4 corrections, 8 test requirements.
   - `index.md` — added evening 3 and evening 4 entries.

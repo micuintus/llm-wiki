@@ -25,9 +25,9 @@ see_also:
 
 # DACMICU implementation plan for Pi
 
-> **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design; (2) TODO state is lost on compaction — silently breaking the central deterministic-loop feature on any long workflow. The plan needs **redesign**, not just adjustments. 6 additional HIGH-severity findings (nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID not result, single-driver invariant unenforced, etc.) plus the prior critical review findings.
+> **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design — corrected by spawning subagent; (2) TODO state is lost on compaction — corrected by file-backed primary storage. 6 additional HIGH-severity findings (nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID not result, single-driver invariant unenforced, etc.) have been fixed in the canonical docs. This plan reflects the corrected designs.
 
-> The single-extension design previously committed here has been replaced by the modular six-package monorepo described in [modular-architecture](modular-architecture.md). This page now serves as the build sequencing plan against that architecture.
+> Prior critical review: [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md).
 
 ## Build sequence
 
@@ -36,7 +36,7 @@ see_also:
 | Step | Package | Depends on | Done when |
 |---|---|---|---|
 | 1 | `@pi-dacmicu/base` | (Pi core only) | `pi -e ./packages/base` registers `signal_loop_success`; an `agent_end` listener attached via the exported `attachLoopDriver()` helper drives a manual test loop. |
-| 2 | `@pi-dacmicu/todo` | base | TODO tool reconstructs from `getBranch()`; `/todo-loop` command activates driven mode; loop terminates on `unchecked == 0`; survives `/compact` via `session_before_compact`. |
+| 2 | `@pi-dacmicu/todo` | base | TODO tool reconstructs from session-scoped file (`~/.pi/dacmicu/state/<session-id>.json`); `/todo-loop` command activates driven mode; loop terminates on `unchecked == 0`; file survives `/compact`. Session entries are secondary (LLM-visible history). |
 | 3 | ~~`@pi-dacmicu/subagent`~~ | — | **DROPPED** (evening 2). Use `tintinweb/pi-subagents` via `pi.events`-RPC instead. LLM uses tintinweb's `Agent` tool (Claude Code-idiomatic name) directly; no DACMICU subagent tool. |
 | 4 | `@pi-dacmicu/fabric` | (none) | `pi-callback` CLI installed on PATH; bash `tool_call` interceptor prepends `PI_CALLBACK_SOCKET=...` to commands; round-trip from a bash heredoc through socket back to `pi.sendMessage` works. |
 | 5 | `@pi-dacmicu/ralph` | base; **soft-dep on `tintinweb/pi-subagents`** | `/ralph "<goal>"` command; per-iteration check optionally spawns a tintinweb subagent for fresh context via `subagents:rpc:spawn`; degrades to inline (Variant A) if tintinweb absent; LLM-emitted `ralph_done` tool ends the loop. |
@@ -66,25 +66,32 @@ export interface LoopDriver {
 }
 
 export function attachLoopDriver(pi: ExtensionAPI, driver: LoopDriver): () => void;
+
+/** Append to systemPrompt without overwriting sibling extensions. */
+export function appendSystemPrompt(current: string, addition: string): string;
+
+/** Read/write session-scoped durable state (survives compaction). */
+export function readState<T>(ctx: ExtensionContext, key: string): T | undefined;
+export function writeState<T>(ctx: ExtensionContext, key: string, value: T): void;
 ```
 
 `attachLoopDriver` returns a detach function. Consumers (todo, ralph, evolve) call it once during their factory, register their own tools, and base handles `agent_end` orchestration centrally — guarding `ctx.hasPendingMessages()`, checking abort, calling `sendMessage({triggerTurn:true, deliverAs:"followUp"})`.
 
-This consolidates the loop-driver pattern that is currently re-implemented per-extension in `pi-evolve.ts`, `kostyay/agent-stuff/loop.ts`, `tmustier/pi-ralph-wiggum`, and others.
+**Single-driver sentinel**: `attachLoopDriver` checks `getBranch()` for an existing `dacmicu:driver` sentinel and throws if one is found. This prevents two DACMICU loop drivers from competing for the same session.
 
 ## Hooks each package uses
 
 | Hook | base | todo | fabric | ralph | evolve |
 |---|:-:|:-:|:-:|:-:|:-:|
 | `agent_end` | ✓ (orchestrator) | (via base) | | (via base) | (via base) |
-| `before_agent_start` | ✓ (chains additions) | ✓ | | ✓ | ✓ |
-| `session_before_compact` | ✓ (calls compactionSummary) | (via base) | | (via base) | (via base) |
-| `session_start` / `session_tree` | | ✓ | ✓ (socket bind) | | ✓ |
+| `before_agent_start` | ✓ (chains via `appendSystemPrompt`) | ✓ | | ✓ | ✓ |
+| `session_before_compact` | ✓ (writes state file, builds CompactionResult) | (via base) | | (via base) | (via base) |
+| `session_start` / `session_tree` | ✓ (rehydrates from file) | ✓ | ✓ (socket bind) | | ✓ |
 | `session_shutdown` | ✓ (cleanup) | | ✓ (socket close) | | |
-| `tool_call` (bash) | | | ✓ (env+timeout) | | |
-| `pi.sendMessage(triggerTurn:true)` | ✓ (sole caller) | | | | |
+| `tool_call` (bash) | | | ✓ (env injection) | | |
+| `pi.sendMessage(triggerTurn:true)` | ✓ (sole caller, guarded by sentinel) | | | | |
 | `pi.exec` | | | | | ✓ (git) |
-| `pi.events.emit("subagents:rpc:spawn")` | | | | ✓ (RPC client) | ✓ (RPC client) |
+| `pi.events.emit("subagents:rpc:spawn")` | | | | ✓ (two-step RPC) | ✓ (two-step RPC) |
 | `pi.registerTool` | ✓ (`signal_loop_success`) | ✓ | | ✓ (`ralph_done`) | ✓ |
 | `pi.registerCommand` | | ✓ (`/todo-loop`, `/todos`) | | ✓ (`/ralph`) | ✓ (`/evolve`) |
 
@@ -106,12 +113,15 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 | Issue | Resolution path |
 |---|---|
-| In-process subagent (`ctx.modelRegistry.stream()`) — unverified pattern | Build a 30-line proof in step 3 before committing to the variant. If unworkable, drop and offer subprocess only. |
-| Per-turn `systemPrompt` injection cost | Measure on long evolve runs. If material, switch to `customType` message that compacts naturally. |
-| Compaction-preservation prompt wording | Borrow from `pi-evolve.ts:486-505`; iterate on observed compaction outputs. |
-| Cycle detection (LLM stuck without making progress) | Track per-iteration deltas in `appendEntry`; stop on N consecutive iterations without state change. Threshold N=3 to start. |
-| Unix socket survival across `/reload` | Test against pi `session_start` reason `"reload"`; bind once per process, not per session start. |
-| Ordering of multiple `tool_call` bash interceptors | Document chain order; fabric's interceptor should be idempotent (skip if `PI_CALLBACK_SOCKET` already set). |
+| **In-process subagent for fabric `wait:true`** | Use `createAgentSession` if available; fallback to `pi --mode json -p --no-session` subprocess. Test both paths. |
+| **Per-turn `systemPrompt` injection cost** | `before_agent_start` returning `{systemPrompt}` is per-turn, not cached. For long evolve sessions injecting selection.md every turn, measure whether this materially affects cost. Alternative: inject as `customType` message that compacts naturally. |
+| **Compaction-preservation prompt wording** | Build `CompactionResult` with `details: {dacmicuState}` and file-backed fallback. Test: start loop → trigger compaction → verify state survives. |
+| **Cycle detection (LLM stuck without making progress)** | Track per-iteration deltas in state file; stop on N consecutive iterations without state change. Threshold N=3 to start. |
+| **Unix socket survival across `/reload`** | Test against pi `session_start` reason `"reload"`; bind once per process, not per session start. |
+| **Ordering of multiple `tool_call` bash interceptors** | Document chain order; fabric's interceptor should be idempotent (skip if `PI_CALLBACK_SOCKET` already set). |
+| **Reassessment phase state machine** | Implement `Phase = "work" | "reassess"` in base runtime. Test: verify loop alternates WORK → REASSESS → WORK. |
+| **Single-driver sentinel collision** | Test: attach todo driver, then try attaching ralph driver → expect clear error. |
+| **Subagent result extraction (evolve)** | Design parser for benchmark scores from `subagents:completed` `result` text. Handle timeouts, failures, malformed output. |
 
 ## Estimated effort
 
@@ -123,14 +133,14 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 | Package | Original LOC | Revised LOC | Revised Notes |
 |---|---|---|---|
-| base | ~200 | ~150 | Internal module (not standalone package). `attachLoopDriver` + `signal_loop_success` + compaction preservation. |
-| todo | ~250 | ~200 | Loop driver + widget + `/todo-loop`. **Reassessment optional (default: off)** — reduces complexity and token cost. |
+| base | ~200 | **~250** | Internal module. `attachLoopDriver` + `signal_loop_success` + **file-backed state** (`readState`/`writeState`) + **compaction preservation** (CompactionResult with details) + **`appendSystemPrompt`** + **single-driver sentinel**. |
+| todo | ~250 | **~250** | Loop driver + widget + `/todo-loop`. **Reassessment is load-bearing** (phase state machine: WORK → REASSESS → WORK). |
 | ~~subagent~~ | — | — | Dropped. |
-| fabric | ~250 | ~250 | User confirmed: tried in opencode, wants it. Socket server + bash interceptor + CLI. |
-| ralph | ~200 | ~150 | Thin wrapper around DACMICU base. Flexible: Variant A (in-session) or Variant B (subagent via tintinweb). |
-| evolve | ~600 | ~600 | **User confirmed: key feature.** Build from scratch. MATS loop, git branches, `selection.md` ledger, Variant B via tintinweb. |
-| **Total v1** | **~1,500** | **~1,350** | Plus ~10 LOC meta-package. |
-| Reused via soft-deps | ~6,600 | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. |
+| fabric | ~250 | **~250** | Socket server + **subagent spawn for `wait:true`** + bash env injection. No `pi.wrapTool` (doesn't exist). |
+| ralph | ~200 | **~150** | Thin wrapper around DACMICU base. Variant A default; Variant B via two-step subagent RPC. |
+| evolve | ~600 | **~1,200** | **Significant rewrite required.** Draft is Variant A (in-session); target is Variant B (subagent-per-candidate). Includes: subagent spawn coordination, result extraction from `subagents:completed`, timeout handling, selection ledger. |
+| **Total v1** | **~1,500** | **~2,100** | Plus ~10 LOC meta-package. |
+| Reused via soft-deps | ~6,600 | **~5,723** | tintinweb/pi-subagents (~5,217) + tintinweb/pi-manage-todo-list (~506). |
 
 **Why the original "2-3 days" estimate was wrong**: It assumed "lift existing code" would be fast. But the existing code is either unverified drafts (pi-evolve.ts), demo-quality examples (todo.ts has no widget/loop driver), or ecosystem extensions with different semantics. Integration testing, `/fork`/`/compact`/`/reload` edge cases, and real TUI testing consume most of the time — not the initial code writing.
 

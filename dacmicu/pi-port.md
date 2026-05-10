@@ -57,13 +57,13 @@ Five reasons, each grounded in the verified pi-mono primitives:
 
 1. **Single context window guaranteed by construction.** Iterations run in the same `Agent.prompt()` flow against the same session JSONL, same compaction state. Opencode's bash form sometimes spawns child sessions and loses this.
 2. **Native rendering of every inner call.** No JSON re-parse, no UI translation. Each iteration's tool calls and assistant messages flow through pi's normal TUI path.
-3. **State branches with the session tree.** Tool result `details` and `pi.appendEntry` entries are part of the session JSONL, so `/fork`, `/clone`, `/tree` all work correctly without any extra coordination.
-4. **Compaction stays honest.** `session_before_compact` lets the extension provide a custom summary that preserves the loop's breakout condition (verified: `pi-evolve.ts:486`).
+3. **State branches with the session tree.** Tool result `details` and `pi.appendEntry` entries are part of the session JSONL, so `/fork`, `/clone`, `/tree` all work correctly without extra coordination. **Note**: `event.messages` in any single `agent_end` only shows the current cycle, not full history. Cross-iteration state must use `ctx.sessionManager.getBranch()` or `pi.appendEntry()`.
+4. **Compaction stays honest.** `session_before_compact` lets the extension provide a custom `CompactionResult` (summary + `details`) that preserves structured state. File-backed storage is the durable fallback for long workflows.
 5. **The whole hook surface exists today.** Verified line-by-line against pi-mono source — see [modular-architecture — Verified Pi primitives](modular-architecture.md#verified-pi-primitives--what-each-package-uses).
 
 ## Reference implementations
 
-The canonical **production** reference for the in-session driver pattern is `mitsuhiko/agent-stuff/extensions/loop.ts` (~250 LOC, 2,275 ⭐ repo). It implements the same hooks with `session_before_compact` preservation (the only extension in the ecosystem that does this correctly).
+The canonical **production** reference for the in-session driver pattern is `mitsuhiko/agent-stuff/extensions/loop.ts` (~250 LOC, 2,275 ⭐ repo). It implements the same hooks and adds instructions to the `session_before_compact` summary to remind the LLM that the loop is active — the only extension in the ecosystem that handles compaction at all.
 
 A 510-LOC draft was written during DACMICU planning at `examples/extensions/pi-evolve.ts` (untracked at repo root, unverified). It implements the same hook patterns correctly but is **not an upstream reference** — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The draft's line numbers are accurate but confer no external validation.
 
@@ -94,7 +94,7 @@ The in-session driver pattern is independently implemented in the wild by at lea
 
 - `mitsuhiko/agent-stuff/extensions/loop.ts` — Armin Ronacher; canonical DACMICU pattern in Pi
 - `kostyay/agent-stuff/pi-extensions/loop.ts` — `signal_loop_success` tool, `session_before_compact` preservation, `wasLastAssistantAborted` userland helper
-- `tmustier/pi-extensions/pi-ralph-wiggum` — pause/resume via session state, max-iteration cap, `before_agent_start` system-prompt injection
+- `tmustier/pi-extensions/pi-ralph-wiggum` — auto-continue loop; `before_agent_start` system-prompt injection. (Claims of pause/resume and max-iteration cap were **false** — see [verification audit](archive/research-2026-05-10-comprehensive-verification-audit.md) § 1.)
 - `latent-variable/pi-auto-continue` — `setTimeout(..., 0)` defer trick to let agent settle into idle before injecting next message
 
 The 510-LOC draft at `examples/extensions/pi-evolve.ts` implements the same patterns but is untracked and unverified — not a reference, just a planning artifact.

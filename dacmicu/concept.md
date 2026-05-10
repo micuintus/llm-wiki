@@ -47,11 +47,11 @@ Both variants share the same outer loop driver (`@pi-dacmicu/base`'s `attachLoop
 
 The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics: [pi-port](pi-port.md).
 
-1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop".
-2. **Termination predicate** — any of: `signal_loop_success` called, iteration cap hit, task predicate false, turn aborted, **`ctx.hasPendingMessages()` true** (yield to user mid-turn).
-3. **`pi.sendMessage({customType, content, display:true}, {triggerTurn:true, deliverAs:"followUp"})`** — appends a synthesized "user message" to the same `state.messages` and reschedules a turn through `agent.followUp()`. Full prior context preserved.
-4. **`signal_loop_success` tool** — LLM-callable break statement. Pairs with the iteration cap (the involuntary break).
-5. **`session_before_compact` preservation** — mark `customType: "dacmicu-*"` messages so `/compact` mid-loop doesn't drop the loop's reasoning chain. Only `mitsuhiko/agent-stuff/loop.ts` does this in the existing ecosystem; it is the rarest and most important detail.
+1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop". Note: `event.messages` contains only the **current cycle's** messages, not the full loop history. For cross-iteration state, use `ctx.sessionManager.getBranch()` or `pi.appendEntry()`.
+2. **Termination predicate** — any of: `signal_loop_success` called, task predicate false, turn aborted, **`ctx.hasPendingMessages()` true** (yield to user mid-turn). **Iteration cap** can be added as a mechanical guardrail (default: 50) but is NOT present in the canonical reference (`mitsuhiko/agent-stuff/loop.ts`). Without an added cap, **zero** termination conditions are fully mechanical — all require LLM cooperation or user action.
+3. **`pi.sendMessage({customType, content, display:true}, {triggerTurn:true, deliverAs:"followUp"})`** — when the agent is idle (normal at `agent_end`), this starts a new turn via `agent.prompt()`. When the agent is streaming (rare at `agent_end` but possible with concurrent events), it queues via `agent.followUp()`. The `deliverAs` parameter is ignored in the idle path; `followUp` is used only during streaming. See [steering-vs-followup](../architecture/steering-vs-followup.md) for the full path matrix.
+4. **`signal_loop_success` tool** — LLM-callable break statement.
+5. **`session_before_compact` preservation** — no "marking" mechanism exists. Extensions return a full `CompactionResult` (summary text + `firstKeptEntryId` + `details`) to override default compaction behavior. Mitsuhiko's loop appends instructions to influence the LLM-generated summary text — it does NOT preserve specific messages. DACMICU's base package provides a `CompactionResult` with `details: {dacmicuState}` and a file-backed fallback. See [TODO-state fix](#todo-state-fix) below.
 
 Not a subagent. Not a subprocess. Not autonomous — the LLM still drives every turn; the driver only schedules *when* the next turn fires.
 
@@ -65,23 +65,43 @@ User asks for a complex task
 LLM creates TODO list via manage_todo_list tool
     ↓
 agent_end fires → DACMICU loop driver:
-    1. CHECK  → Scan session entries, read current TODO state
-    2. UPDATE → Reassess: are items still valid? Reorder? Merge?
-    3. WORK   → If items remain, inject next item as followUp
-    ↓
+    CHECK → Read current TODO state from file
+      ↓ unchecked > 0
+    WORK → Inject top item as followUp
+      ↓
 LLM works that item, marks done via manage_todo_list
-    ↓
-agent_end fires → repeat CHECK → UPDATE → WORK
-    ↓
+      ↓
+agent_end fires → CHECK → Read updated state
+      ↓ unchecked > 0
+    REASSESS → Inject "reassess list validity" prompt
+      ↓
+LLM reviews list, updates via manage_todo_list (or leaves as-is)
+      ↓
+agent_end fires → CHECK → Read updated state
+      ↓ unchecked > 0
+    WORK → Inject new top item
+      ↓
+    ... (cycle: WORK → REASSESS → WORK → REASSESS ...)
+      ↓
 All items done → loop terminates
 ```
 
 **Key design decisions:**
 
 - **Loop driver runs on `agent_end`**, not as a tool the LLM calls. The LLM works items; the loop decides when to continue.
-- **Reassessment (UPDATE) is load-bearing.** Before working the next item, the loop injects a bounded validation turn: "Is this still the highest-priority item? Has context changed?" This prevents blindly working stale TODOs.
-- **TODO state is passive.** The loop reads state; the LLM mutates it via the standard tool. No DAG, no auto-reminders, no active-task heuristics — those fight loop-driver ownership.
-- **Session-entry persistence** (tool-result `details`) branches with `/fork` automatically. File-backed storage does not.
+- **Reassessment is load-bearing.** Before working the next item, the loop injects a reassess turn: "Given what we just learned, is the TODO list still valid? Reorder? Merge? Add items?" The LLM updates the list via `manage_todo_list`. The driver then works the new top item. This adds one LLM turn per item (doubles token cost vs. no-reassess) but prevents blindly working stale TODOs.
+- **Reassessment termination is implicit.** The reassess turn is a normal assistant iteration. At its `agent_end`, the driver reads the updated TODO state (from the file) and proceeds to the work turn. No special `confirm_reassessment` tool needed. The LLM signals completion by simply not calling `manage_todo_list` (implied: "list is fine, proceed").
+- **Phase state machine:**
+  ```
+  Initial: user creates list → phase = WORK
+  WORK turn completes → agent_end → CHECK → phase = REASSESS → inject reassess prompt
+  REASSESS turn completes → agent_end → CHECK → phase = WORK → inject work prompt for top item
+  unchecked == 0 at any CHECK → stop
+  ```
+- **TODO state is stored in a session-scoped file** (`~/.pi/dacmicu/state/<session-id>.json`). The file is the durable source of truth. Session entries (tool-result `details`) are secondary — they provide LLM-visible history but are **lost on compaction**. On `session_start`, the driver reads the file first, falls back to session-entry reconstruction for forks/new sessions.
+- **File-backed storage branches with `/fork` via session IDs.** Each session (including forks) gets a unique ID; the state file is keyed by ID. This gives per-branch isolation without the fragility of session-entry scanning.
+- **Session-entry persistence** (tool-result `details`) provides LLM-visible history but is **lost on compaction**. File-backed storage is the durable source of truth. Both are used: file for the driver, entries for the LLM.
+- **No DAG, no auto-reminders, no active-task heuristics** — those fight loop-driver ownership.
 
 See [TODO base decision](#todo-base-tintinwebpi-manage-todo-list) below for why `tintinweb/pi-manage-todo-list` is the right primitive.
 
@@ -92,7 +112,7 @@ DACMICU is the **umbrella primitive** unifying four downstream concerns, plus tw
 1. **Ralph Loop** (`@pi-dacmicu/ralph`) — dispatches Variant A (in-session) or Variant B (subagent-per-iteration) per task / user request. Variant B consumes a third-party subagent provider via `pi.events` RPC.
 2. **FABRIC-style composition** (`@pi-dacmicu/fabric`) — agent as a stage in a Unix pipeline; bash-callback infrastructure. Independent of the loop primitive (see Correction below).
 3. **TODO system base** (`@pi-dacmicu/todo`) — deterministic outer loop on `manage_todo_list` state. Variant A consumer. Hard-depends on `@pi-dacmicu/base`. See [deterministic TODO loop](#deterministic-todo-loop--the-core-dacmicu-pattern) above.
-4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. Variant B consumer (each candidate evaluated in isolation). **No validated upstream prototype exists.** A 510-LOC draft was written during DACMICU planning (`examples/extensions/pi-evolve.ts`, untracked at repo root, unverified) — see [verification audit](archive/research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — unrelated to MATS evolution. Build from scratch or adapt patterns from `mitsuhiko/agent-stuff/extensions/loop.ts`.
+4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. **Target: Variant B consumer** (each candidate evaluated in isolation via subagent). The existing 510-LOC draft (`examples/extensions/pi-evolve.ts`) is **Variant A** (in-session git operations, no subagent code). Variant B requires significant rewrite: subagent spawn coordination, result extraction from `subagents:completed` events, per-candidate timeout handling. **Realistic LOC estimate: 1,000-1,500**, not 600.
 5. **Loop primitive** (`@pi-dacmicu/base`) — `agent_end`-driven scheduler with compaction preservation, abort detection, and breakout tool. Substrate-agnostic (Variant A or B). Exports the runtime as a library for the four consumers above.
 6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08.** Standing on the existing Pi subagent ecosystem. **v1 simplification: depend only on `tintinweb/pi-subagents`** (which exposes Claude Code-idiomatic `Agent`/`get_subagent_result`/`steer_subagent` tools — `Agent` is the canonical name; `Task` is a doc alias. LLM training-known shapes, free prompt tokens). No multi-mode `delegate()` API; the LLM uses tintinweb's `Agent` tool directly. Variant A (inline) is default; Variant B (subagent) opt-in via tintinweb's tools. `HazAT/pi-interactive-subagents` integration deferred to v1.x.
 
@@ -125,19 +145,31 @@ The deep ecosystem cascade ([ecosystem/subagents](../ecosystem/subagents.md)) fo
 
 ### Coupling shape
 
-`@pi-dacmicu/ralph` and `@pi-dacmicu/evolve` (Variant B consumers) emit on the `pi.events` bus:
+`@pi-dacmicu/ralph` and `@pi-dacmicu/evolve` (Variant B consumers) emit on the `pi.events` bus. **The RPC is two-step**: spawn returns an ID synchronously; completion arrives via a separate event.
 
 ```ts
+// Step 1: Spawn
 const requestId = randomUUID();
 pi.events.emit("subagents:rpc:spawn", {
   requestId, type: "general-purpose", prompt, options: { ... },
 });
-const result = await new Promise(resolve => {
+const { id } = await new Promise(resolve => {
   pi.events.on(`subagents:rpc:spawn:reply:${requestId}`, resolve);
+});
+
+// Step 2: Wait for completion
+const result = await new Promise((resolve, reject) => {
+  const offC = pi.events.on("subagents:completed", (data) => {
+    if (data.id === id) { offC(); offF(); resolve(data); }
+  });
+  const offF = pi.events.on("subagents:failed", (data) => {
+    if (data.id === id) { offC(); offF(); reject(data); }
+  });
+  // Add your own timeout race
 });
 ```
 
-That's it. No bundled subagent code. `Hopsken/pi-subagents` (installed separately) handles the rest. If it's not installed, the Variant B consumer degrades gracefully to a "subagent provider missing" notification or falls back to running Variant A.
+The reply contains `{id: string}`, not the subagent's result. Result extraction is from `result.result` (the subagent's final output text) — brittle for structured data like benchmark scores. Evolve must parse numbers from prose.
 
 ### What we **do** still own
 
@@ -184,6 +216,58 @@ Earlier framing implied DACMICU needed the `pi` CLI / Unix-socket infrastructure
 - Pi's in-agent driver covers Ralph loops natively, more cleanly than opencode's bash form, while preserving the single-context-window guarantee.
 
 FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/deterministic-agent-control-mechanisms.md)) remains a real Pi gap, but it is an **independent capability** — useful for shell pipelines, not for the loop-until-done pattern DACMICU implements. See [spirit-vs-opencode](spirit-vs-opencode.md) for the full mapping.
+
+## Single-driver invariant enforcement
+
+Pi's extension runner fires **all** `agent_end` handlers from **all** extensions sequentially (`runner.ts:emit()`, ~lines 470-510). There is no enforcement that only one calls `sendMessage(triggerTurn:true)`. If two loop extensions are active simultaneously, both fire `triggerTurn`, producing alternating prompts with undefined ordering.
+
+**DACMICU's enforcement pattern** (in `@pi-dacmicu/base`):
+
+```typescript
+const DRIVER_SENTINEL = "dacmicu:driver";
+
+export function attachLoopDriver(pi: ExtensionAPI, driver: LoopDriver): () => void {
+  // Check if another driver is already active
+  const branch = pi.sessionManager?.getBranch?.() || [];
+  const hasDriver = branch.some(e => e.type === "app" && e.customType === DRIVER_SENTINEL);
+  if (hasDriver) {
+    throw new Error(`Another DACMICU loop driver is already active. Detach it first.`);
+  }
+  
+  // Register sentinel
+  pi.appendEntry({ type: "app", customType: DRIVER_SENTINEL, data: { driverId: driver.driverId } });
+  
+  // Attach actual listener
+  const off = pi.on("agent_end", async (event, ctx) => { ... });
+  
+  return () => {
+    off();
+    // Sentinel stays in branch (harmless); new sessions won't see it
+  };
+}
+```
+
+This is a **convention + check**, not core enforcement. Documented limitation: if two non-DACMICU loop extensions are active (e.g. mitsuhiko's loop + latent-variable's auto-continue), DACMICU cannot prevent their collision. The user must not run multiple loop extensions simultaneously.
+
+## `before_agent_start` systemPrompt chaining
+
+`before_agent_start` handlers receive `event.systemPrompt` (the current prompt) and can return `{systemPrompt: string}` to replace it. **Each handler sees the previous handler's result.** If extension B returns just its own fragment, extension A's contribution is lost.
+
+**DACMICU's `appendSystemPrompt` helper** (in `@pi-dacmicu/base`):
+
+```typescript
+export function appendSystemPrompt(current: string, addition: string): string {
+  return addition ? `${current}\n\n${addition}` : current;
+}
+
+// Usage in a handler:
+pi.on("before_agent_start", async (event, ctx) => {
+  const todoContext = getTodoContext(ctx);
+  return { systemPrompt: appendSystemPrompt(event.systemPrompt, todoContext) };
+});
+```
+
+All DACMICU packages use this helper. Documented contract: "Read `event.systemPrompt`, append your fragment, return the result. Never return just your fragment."
 
 ## Key claims
 

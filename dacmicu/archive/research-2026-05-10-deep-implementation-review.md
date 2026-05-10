@@ -576,4 +576,26 @@ The plan is not ready to build. It is ready to be **redesigned** in light of the
 
 ---
 
+## Fixes applied to canonical docs (2026-05-10)
+
+The following corrections have been merged into the canonical wiki documents:
+
+| Finding | File(s) | Fix |
+|---|---|---|
+| **CRITICAL-1** pi-callback deadlock | `implementations/pi-callback-extension.md` | Complete redesign: `wait:true` spawns subagent; `wait:false` is fire-and-forget only; removed `pi.wrapTool` Layer 2 |
+| **CRITICAL-2** TODO state lost on compaction | `concept.md`, `implementation-plan.md` | File-backed primary storage (`~/.pi/dacmicu/state/<session-id>.json`); session entries secondary; base exports `readState`/`writeState` |
+| **HIGH-3** `pi.wrapTool` nonexistent | `pi-callback-extension.md` | Removed Layer 2; documented `tool_call` mutation as only mechanism |
+| **HIGH-4** `subagents:rpc:spawn` returns ID | `concept.md`, `modular-architecture.md` | Documented two-step pattern (spawn + `subagents:completed`/`failed` events) |
+| **HIGH-5** `event.messages` is one cycle | `concept.md`, `pi-port.md` | Clarified: use `getBranch()` or `appendEntry()` for cross-iteration state |
+| **HIGH-6** Single-driver unenforced | `concept.md`, `implementation-plan.md` | Added sentinel registry pattern via `appendEntry`; `attachLoopDriver` checks for existing sentinel |
+| **HIGH-7** `systemPrompt` REPLACES | `concept.md`, `implementation-plan.md` | Added `appendSystemPrompt` helper; documented chaining contract |
+| **HIGH-8** Reassessment no termination | `concept.md` | Designed phase state machine (WORK → REASSESS → WORK); termination implicit via `agent_end` + state read |
+| **MEDIUM-9** Preservation misdescribed | `concept.md`, `pi-port.md` | Replaced "mark customType" with accurate `CompactionResult` override description |
+| **MEDIUM-10** `pi.events` bare EventEmitter | `modular-architecture.md` | Documented 30-LOC wrapper; noted soft-dep on tintinweb convention |
+| **MEDIUM-11** Iteration cap not in reference | `concept.md`, `pi-port.md` | Documented as optional guardrail (default: 50), not inherited from reference |
+| **LOW-13** 6,600 LOC overstated | `implementation-plan.md`, `log.md` | Corrected to 5,723 |
+| **LOW-15** pi-evolve.ts no subagent | `concept.md`, `modular-architecture.md`, `implementation-plan.md` | Updated to "Target: Variant B"; draft is Variant A; LOC revised 600→1,200 |
+
+---
+
 *Review completed 2026-05-10. Method: read primary sources (Pi extension types, runner, agent-session, event-bus, compaction code, todo example, mitsuhiko loop, tintinweb subagents/todo) and verify each load-bearing claim against actual code. Findings ordered by severity.*
