@@ -1,7 +1,7 @@
 ---
 title: TODO list extensions in the Pi ecosystem
 type: concept
-updated: 2026-05-08
+updated: 2026-05-10
 sources:
   - https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/todo.ts
   - https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/message-renderer.ts
@@ -15,6 +15,7 @@ sources:
   - https://github.com/tintinweb/pi-tasks
   - https://github.com/Soleone/pi-tasks
   - https://github.com/mitsuhiko/agent-stuff/blob/main/extensions/todos.ts
+  - https://github.com/edxeth/pi-tasks
 tags: [extension, todo, dacmicu, widget, ui, idiomatic-tools]
 see_also:
   - "loop-extensions.md"
@@ -44,7 +45,8 @@ Pi has implementations of all three. None match Claude Code's `TodoWrite` widget
 | Extension | LOC | Pattern | Tool shape | Trained-on origin | State | UI | Notes |
 |-----------|-----|---------|------------|-------------------|-------|----|-------|
 | `pi-mono/examples/extensions/todo.ts` | 297 | Tool-only (reference) | Custom (`add`/`update`/`remove`/`set-state`) | None — bespoke | session `details` | `/todos` slash | Branch-safe pattern; canonical starting point |
-| **`tintinweb/pi-manage-todo-list`** | **506** | **Tool + widget + slash** | **`manage_todo_list` `{operation: read\|write, todoList}`** | **GitHub Copilot Chat — verbatim** | session `details` (branch-safe) | `setWidget` factory + theme + strikethrough + `/todos` | **Recommended DACMICU TODO base.** See [research 2026-05-08 § Q2](../dacmicu/archive/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension). |
+| **`tintinweb/pi-manage-todo-list`** | **506** | **Tool + widget + slash** | **`manage_todo_list` `{operation: read\|write, todoList}`** | **GitHub Copilot Chat — verbatim** | session `details` (branch-safe) | `setWidget` factory + theme + strikethrough + `/todos` | **Recommended DACMICU TODO base.** Minimal surface, session-entry persistence, no DAG. |
+| `edxeth/pi-tasks` | ~1,100 | 5 tools + widget + file-backed | `task_create`/`task_list`/`task_get`/`task_update`/`task_batch` | Claude Code — verbatim | file-backed (`~/.pi/tasks/`), fork-copy, branch-aware restore | `setWidget` factory, 3-view cycle, stats inline | **Strongest full task system in Pi.** See [assessment below](#edxethpi-tasks-assessment-for-dacmicu). |
 | `tintinweb/pi-tasks` | 2,061 | 7 tools + DAG + file-backed | `TaskCreate`/`TaskList`/`TaskGet`/`TaskUpdate`/`TaskOutput`/`TaskStop`/`TaskExecute` | Claude Code — verbatim | file-backed (cross-session) | Animated star spinner, deps shown | Author markets as successor; rejected for DACMICU (DAG fights deterministic outer loop) |
 | `Soleone/pi-tasks` | 3,566 | Pluggable backends | Variable per backend | Variable | beads / `todo.md` / … | Yes | Heavyweight |
 | `mitsuhiko/agent-stuff/todos.ts` | 2,082 | Tool + file-per-todo | Custom (markdown files) | None | `.pi/todos/*.md` | Status indicator | File-on-disk, less branch-safe |
@@ -191,6 +193,42 @@ LLMs are trained on Claude Code's `TodoWrite` and VSCode Copilot's `manage_todo_
 
 > **Earlier wiki claim correction (evening 3)**: previous text said tintinweb "mirrors Copilot ≈ Claude Code TodoWrite". The two are **different shapes**, not approximately equal. Wiki has been corrected.
 
+## `edxeth/pi-tasks` — assessment for DACMICU
+
+[edxeth/pi-tasks](https://github.com/edxeth/pi-tasks) (v1.1.2, MIT, ~1,100 LOC) is a **production-grade session-scoped task system** forked from `tintinweb/pi-tasks` and reworked toward Claude Code parity. It is the most feature-complete TODO/task extension in the Pi ecosystem.
+
+### What it does
+
+- **5 model-callable tools**: `task_create`, `task_list`, `task_get`, `task_update`, `task_batch` (atomic, all-or-nothing)
+- **Dependency DAG**: bidirectional `blocks` / `blockedBy` with cycle detection and dangling-reference warnings
+- **Stats tracking**: per-task runtime, tool-use count, last tool, output tokens (including subagent results)
+- **Widget**: `setWidget` factory form, 3-view cycle (`open` / `all` / `hidden`) via `Ctrl+Alt+T`, theme-aware, inline stats
+- **Reminders**: hidden read-only system reminder injected after 10 turns without task-tool use
+- **Session scoping**: file-backed (`~/.pi/tasks/<sessionKey>/`), with fork-copy and branch-aware restore via `.tree/<leafId>/` snapshots
+- **System prompt injection**: `TASK_SYSTEM_POLICY` appended via `before_agent_start` to guide LLM task-tool usage
+
+### Why it is NOT the DACMICU TODO base
+
+| Concern | `edxeth/pi-tasks` | DACMICU needs |
+|---|---|---|
+| **Storage model** | File-backed (survives `/compact`, fork-copy on `/fork`) | Session-entry `details` (branches with JSONL automatically, no file sync) |
+| **Tool surface** | 5 granular tools | 1 tool (`manage_todo_list`) — less for LLM to misuse |
+| **Dependency DAG** | Built-in `blocks`/`blockedBy` | **None** — the deterministic outer loop IS the ordering mechanism |
+| **Opinionated behavior** | Stats, reminders, active-task heuristics, system-policy injection | Minimal — loop driver owns behavior |
+| **Size** | ~1,100 LOC | ~150–250 LOC overlay on top of base |
+
+The dependency DAG is the dealbreaker. If the LLM can express "task B blocks task A" natively, it will use that to drive ordering — bypassing DACMICU's deterministic reassessment step. The outer loop and the DAG fight for control.
+
+File-backed storage is also a different model from session-entry-based: it survives `/compact` (good) but does NOT branch with the session JSONL (the file state is separate from the conversation tree). A `/fork` followed by divergent task edits in each branch creates a single shared file — the branches silently overwrite each other.
+
+### When to pick `edxeth/pi-tasks`
+
+Use it when you want a **full Claude Code-style task experience** in Pi: dependency tracking, stats, reminders, rich widget. Do NOT use it as the foundation for a deterministic-loop extension — its opinions are too strong and its DAG conflicts with loop-driver ownership.
+
+### When to pick `tintinweb/pi-manage-todo-list`
+
+Use it when you want a **minimal primitive** to build a deterministic loop on top of: one tool, flat list, session-entry persistence, no DAG, no stats, no reminders. The LLM uses `manage_todo_list` to mutate state; the outer loop reads that state and decides what to do next. Separation of concerns is clean.
+
 ## Why no Pi extension matches Claude Code's `TodoWrite` polish
 
 Claude Code's `TodoWrite` is a **first-class built-in tool** with TUI rendering on every state change. The polish gap in the Pi ecosystem is **structural in the extensions, not in Pi itself** — Pi exposes everything needed; nobody has wired it up yet.
@@ -202,7 +240,7 @@ Researched 2026-05-08 across the in-tree examples and the production ecosystem. 
 | # | Layer | Primitive | Used by | Status |
 |---|---|---|---|---|
 | 1 | Action confirmation (per-call) | `renderResult(result, {expanded}, theme, ctx)` returning a TUI Component | `examples/extensions/todo.ts:228` ("✓ #3 buy milk"); all TODO impls | **In-tree reference uses this.** |
-| 2 | Persistent status (always visible) | `ctx.ui.setWidget(key, factory, opts)` — component factory `(tui,theme) => { render(width):string[]; invalidate():void }` | **`davebcn87/pi-autoresearch/extensions/pi-autoresearch/index.ts:1294-1380`**: collapsed (one-liner) and expanded (full table) states, switchable via configurable shortcut keys (`Ctrl+Shift+T` / `Ctrl+Shift+F`) read from `/extensions/pi-autoresearch.json` | **Only pi-autoresearch uses the factory form.** Other extensions use static `string[]` form (mitsuhiko, kostyay) or `setStatus` only (tmustier). |
+| 2 | Persistent status (always visible) | `ctx.ui.setWidget(key, factory, opts)` — component factory `(tui,theme) => { render(width):string[]; invalidate():void }` | `davebcn87/pi-autoresearch/extensions/pi-autoresearch/index.ts:1294-1380`: collapsed/expanded states, configurable shortcuts. **`edxeth/pi-tasks`** also uses factory form with 3-view cycle and inline stats. | **pi-autoresearch and edxeth/pi-tasks use the factory form.** Other extensions use static `string[]` form (mitsuhiko, kostyay) or `setStatus` only (tmustier). |
 | 3 | Stream-pinned snapshot (Claude Code-style) | `pi.registerMessageRenderer(customType, renderer)` + extension emits `pi.sendMessage({customType, details:{todos}, display:true})` after meaningful changes | `examples/extensions/message-renderer.ts` (in-tree demo only) | **No production extension uses this.** Free polish win. |
 | 4 | Modal deep-dive (on-demand) | `/todos` command + `ctx.ui.custom<T>(factory)` | `examples/extensions/todo.ts` (`/todos`), pi-autoresearch dashboard, mitsuhiko loop preset selector | **In-tree reference uses this.** |
 
@@ -229,7 +267,7 @@ Properties:
 - Two display modes (collapsed/expanded) toggled by user shortcut, persisted in extension state.
 - User-configurable shortcut keys via per-extension JSON config.
 
-**No other surveyed Pi extension uses this pattern.** Most use the simpler `setWidget(key, ["line 1", "line 2"])` form which doesn't auto-react to terminal resize and doesn't separate computation from rendering. **For `@pi-dacmicu/todo` this is the recommended baseline**, not optional polish.
+Also used by `edxeth/pi-tasks` (3-view cycle: open / all / hidden). Most other extensions use the simpler `setWidget(key, ["line 1", "line 2"])` form which doesn't auto-react to terminal resize. **For `@pi-dacmicu/todo` the factory form is the recommended baseline**, not optional polish.
 
 ### Why layer 3 closes the polish gap
 
