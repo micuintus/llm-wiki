@@ -104,19 +104,17 @@ or to document a correction to prior analysis, see
 ## Navigation and discoverability
 
 A wiki that only machines can navigate compounds poorly. Apply these
-patterns during compile so humans can use it too.
+patterns during compile so humans can use it too. None of this applies
+to wikis under ~10 pages — for small wikis a flat `index.md` is fine.
 
-### README as portal
+### One canonical browse location
 
-The repository `README.md` is the first thing a visitor sees. Do not
-make it a stub that dumps them to `index.md`. It should contain:
+Pick `README.md` *or* `index.md` as the place that lists every
+compiled page, not both. Two browse lists drift the moment you add a
+page. The other file links to it.
 
-- **"I want to…" decision table.** Map the 5–8 most common goals to
-the right page in one glance.
-- **Quick picks.** 3 curated starting points for newcomers — the
-extensions or patterns that multiple curators independently recommend.
-- **Full browse index.** Same categories as `index.md`, with inline
-descriptions, so GitHub visitors don't need to click through.
+The usual split: `README.md` is the GitHub landing (goal-oriented,
+small, links into the wiki); `index.md` is the canonical full browse.
 
 ### Inline table of contents
 
@@ -131,27 +129,9 @@ anchors using the slugified heading text:
 - [Another section](#another-section--with-details)
 ```
 
-This costs ~10 lines and saves scrolling on long surveys.
-
-### Visual anchors on index pages
-
-Category headers in `index.md`-style browse pages get emoji prefixes
-for at-a-glance scanning:
-
-| Emoji | Meaning |
-|---|---|
-| 🔁 | Iteration, loops, agents |
-| ✅ | Task tracking, planning |
-| 🎨 | TUI, themes, visual |
-| 🔧 | Tool behavior, editing |
-| 🌐 | Web, search, information |
-| 🧠 | Knowledge, skills, memory |
-| 📱 | Remote, mobile, access |
-| 🔌 | Integrations, providers, auth |
-| 📋 | References, catalogs, methods |
-| 🚧 | Gaps, stubs, not yet surveyed |
-
-Pick a consistent mapping and document it in `SCHEMA.md`.
+GitHub's slug rules are not obvious for headings with em-dashes,
+parens, or slashes. Verify TOC anchors as part of lint (see below)
+rather than guessing.
 
 ### See also completeness
 
@@ -162,10 +142,10 @@ explanation — the section heading itself is a consistency signal.
 
 ### Decision-support tables
 
-Survey pages (the core value of this wiki format) should end with a
-**picking table**: "If you want X, use Y" with a one-line why. This
-is the payoff for reading the survey — don't make the user synthesize
-themselves.
+Survey pages (pages that compare ≥3 entries in a niche) should end
+with a **picking table**: "If you want X, use Y" with a one-line why.
+This is the payoff for reading the survey — don't make the user
+synthesize themselves. Topic pages and concept pages do not need this.
 
 ## Lint
 
@@ -182,6 +162,11 @@ Two categories with different authority levels.
   `dir/file.md` (looks for subdir, not sibling). If exactly one file
   with the same basename exists elsewhere, fix the path; otherwise
   report.
+- **Anchor links.** For every `](path.md#anchor)` and same-page
+  `](#anchor)` link, verify the anchor matches a slugified heading in
+  the target. GitHub slugifies by lowercasing, replacing spaces with
+  `-`, dropping most punctuation but keeping `-` and `_`, and
+  collapsing repeated `-`. Report mismatches.
 - **Raw-source references.** Every link from a compiled page into
   `raw-sources/` must resolve. Same fix-or-report rule.
 - **See Also bidirectionality.** If A links to B in See Also, B should
