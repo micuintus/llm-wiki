@@ -35,7 +35,23 @@ see_also:
 
 # Subagent ecosystem — comprehensive survey
 
-Deep cascade survey rev 2026-05-08, expanded from earlier 5-extension survey to **12+ extensions** plus a corrected comparison against opencode's actual session navigation model (post-PR #14814).
+Deep cascade survey rev 2026-05-08 (evening 2), expanded from earlier 5-extension survey to **12+ extensions** plus a corrected comparison against opencode's actual session navigation model (post-PR #14814).
+
+## Important correction (2026-05-08 evening 2): Hopsken IS tintinweb
+
+The earlier framing in this doc treated `Hopsken/pi-subagents` (5,159 LOC) and `tintinweb/pi-subagents` (6,082 LOC, "superset") as two distinct packages. **They are the same package.** The Hopsken repo's `package.json` says `"name": "@tintinweb/pi-subagents"` and lists tintinweb as the author and repo URL. Hopsken is a **private mirror/snapshot** of the tintinweb upstream. The "5159 vs 6082, superset" comparison was likely two different versions of the same package surveyed at different times.
+
+Canonical reference is **`tintinweb/pi-subagents`** (271 stars, 27 releases, 8 contributors, last push 2026-05-07). All references to "Hopsken" below should be read as the same package as tintinweb.
+
+## Project health (2026-05-08)
+
+| Repo | Stars | Forks | Open issues | Releases | Contributors | Last push | Verdict |
+|---|---|---|---|---|---|---|---|
+| `nicobailon/pi-subagents` | 1,289 | 181 | 31 | 71 | 20 | 2026-05-03 | Most popular, very active, kitchen-sink |
+| **`HazAT/pi-interactive-subagents`** | **394** | 69 | **6** | **22** | **10** | 2026-04-20 | **Healthy, focused, well-maintained** |
+| **`tintinweb/pi-subagents`** (= Hopsken mirror) | 271 | 61 | 17 | 27 | 8 | 2026-05-07 | Healthy, mature, recent |
+| `tintinweb/pi-manage-todo-list` | 16 | 4 | 1 | — | small | active | Small but focused, single-author |
+| `popododo0720/pi-stuff` | 15 | 0 | 0 | — | 1 | 2026-03-03 | Single-dev, stale (2 months), niche — proof-of-pattern only, not a dependency target |
 
 Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standard opencode-Tab-switch analog" — that comparison was based on a misunderstanding of opencode's UX. **Opencode itself has no tabs**; what it has is session cycling between full-screen views. The actual gap is narrower than previously claimed, and Pi has a *different* extension (`HazAT/pi-interactive-subagents`) that mirrors opencode's UX more closely via terminal multiplexer integration.
 
@@ -58,8 +74,7 @@ Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standa
 
 | Repo | LOC | Distinguishing features | Status |
 |---|---|---|---|
-| `Hopsken/pi-subagents` | 5,159 | `createAgentSession` + ConversationViewer modal (live `session.subscribe`) + agent-tree widget (Braille spinners, live tool activity, token counts) + cross-extension `pi.events` RPC + `.pi/agents/*.md` discovery + DEFAULT_AGENTS registry + memory + group-join + steering + resume + worktree | Production, sophisticated UI |
-| `tintinweb/pi-subagents` | 6,082 | Hopsken superset: + cron/interval/one-shot scheduling + settings management + usage tracking | Production, superset |
+| **`tintinweb/pi-subagents`** (Hopsken is a mirror of this) | ~6,000 | `createAgentSession` + ConversationViewer modal (live `session.subscribe`) + agent-tree widget (Braille spinners, live tool activity, token counts) + cross-extension `pi.events` RPC + `.pi/agents/*.md` discovery + DEFAULT_AGENTS registry + memory + group-join + steering + resume + worktree + scheduling + settings/usage tracking. **Claude Code-idiomatic tool names** (`Task`, `get_subagent_result`, `steer_subagent`) — LLM training-known shape, free prompt tokens. | Production, mature (271 stars, 27 releases) |
 | `tuansondinh/pi-fast-subagent` | unsurveyed | "In-process subagent delegation with single, parallel, and background modes" — minimal in-process variant | Production |
 
 ### Multiplexer-pane-per-subagent (cmux/tmux/zellij/WezTerm)
@@ -452,22 +467,32 @@ The first is a UX nicety. The second is a real defect for evolve-grade post-mort
 - **Variant B simple use cases** (ralph, single subagent at a time) — sufficient.
 - **`@pi-dacmicu/evolve` candidate inspection** — **insufficient**; truncation kills post-mortem; no parallel comparison.
 
-## Subagent provider recommendations for DACMICU (revised)
+## Subagent provider recommendations for DACMICU (revised v2 — 2026-05-08 evening 2)
 
-### Variant B (subagent-per-iteration) — pick by use case
+### v1 simplification (KISS): tintinweb only, defer HazAT
 
-| Consumer | Recommended provider | Rationale |
+After the user pushed back on growing complexity (per-consumer providers, multi-mode `delegate()` API), the v1 plan reduces to **one soft-dep on `tintinweb/pi-subagents`** for both ralph and evolve. HazAT integration is deferred to v1.x driven by real evolve usage data. Rationale captured in [research-2026-05-08-evening2-simplification](../dacmicu/research-2026-05-08-evening2-simplification.md).
+
+| Consumer | v1 (KISS) | v1.x (if data justifies) |
 |---|---|---|
-| `@pi-dacmicu/ralph` (Variant B path) | **Hopsken** (or tintinweb superset) | Live status widget + modal viewer for casual oversight; cross-extension RPC is the right shape; in-process = zero subprocess overhead |
-| `@pi-dacmicu/evolve` candidate inspection | **HazAT** (primary) **+ Hopsken** (fallback) | HazAT puts each candidate in its own mux pane → true parallel inspection, full transcripts, interactive panes. Requires user runs pi in cmux/tmux/zellij/wezterm. Fallback to Hopsken + nicobailon-style JSONL writer if no mux available. |
-| Programmatic embedding (a future package) | **cmf/pi-subagent** library | Designed to be embedded; recursive step composition; rich tree progress UI |
+| `@pi-dacmicu/ralph` | **tintinweb/pi-subagents** via `pi.events` RPC; degrades to inline if absent | unchanged |
+| `@pi-dacmicu/evolve` | **tintinweb/pi-subagents** + JSONL transcript writer (workaround for 500-char trunc) | optional HazAT integration for mux-pane inspection |
+| Programmatic embedding (future) | **cmf/pi-subagent** library | unchanged |
 
-### Why three options, not one
+### Why tintinweb wins for v1
 
-The earlier framing assumed one provider would serve both ralph and evolve. After this expanded survey, that's wrong: ralph and evolve have different inspection needs, and Pi has different tools optimized for each.
+1. **Idiomatic LLM-known shape.** Exposes Claude Code's `Task`, `get_subagent_result`, `steer_subagent` tool names. LLM training-known. Free prompt tokens.
+2. **No multiplexer dependency.** Casual ralph users get a working setup with no cmux/tmux setup.
+3. **Mature.** 271 stars, 27 releases, 8 contributors, last push 2026-05-07.
+4. **Cross-extension RPC contract.** `subagents:rpc:spawn` is the right shape for cross-extension integration.
 
-- **Ralph** is mostly background — user wants to know the loop is making progress, occasionally inspect a stuck iteration. Hopsken's modal is fine.
-- **Evolve** is foreground analytical — user actively compares candidates, looks for *why* one outperformed another. HazAT's mux panes give full text + parallel view.
+### What changed from v1 (evening 1)
+
+| Earlier (evening 1) | Now (evening 2) |
+|---|---|
+| Per-consumer providers: ralph→tintinweb, evolve→HazAT | v1: tintinweb only. HazAT deferred to v1.x. |
+| `delegate({ task, mode })` tool with three modes | No DACMICU subagent tool. LLM uses tintinweb's `Task`. |
+| Two production soft-deps from day 1 | One production soft-dep from day 1 |
 
 ### What still gets dropped from `@pi-dacmicu/*`
 

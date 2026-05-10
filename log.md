@@ -1,5 +1,19 @@
 # Wiki Log
 
+## [2026-05-08 evening 2] simplification | Hopsken=tintinweb correction; v1 = inline + tintinweb only; idiomatic APIs (Claude Code Task / Copilot manage_todo_list)
+- **Critical correction**: `Hopsken/pi-subagents` IS `tintinweb/pi-subagents` (private mirror, package.json says `@tintinweb/pi-subagents`, tintinweb is author/repo URL). Earlier wiki framing of two distinct packages with "5159 vs 6082, superset" comparison was wrong — same package, different snapshots. Canonical: tintinweb (271 stars, 27 releases, last push 2026-05-07).
+- **Project health snapshot** gathered for all candidates: nicobailon (1,289⭐), HazAT (394⭐ healthy), tintinweb (271⭐ healthy), tintinweb/pi-manage-todo-list (16⭐ small but focused), popododo (15⭐ single-dev stale 2 months — ruled out as dependency).
+- **Idiomatic LLM-known API findings**: tintinweb/pi-subagents exposes Claude Code's `Task`/`get_subagent_result`/`steer_subagent` tool names verbatim; tintinweb/pi-manage-todo-list mirrors VSCode Copilot's `manage_todo_list` shape verbatim. Both are LLM training-known shapes — free prompt tokens. Strongest argument for reuse: inventing DACMICU-specific shapes burns prompt tokens explaining non-standard APIs.
+- **DACMICU v1 simplification (KISS)**: drop the multi-mode `delegate({task, mode})` API. v1 ships **inline + tintinweb only**, both ralph and evolve. HazAT integration deferred to v1.x driven by real evolve usage data. Evolve workaround for 500-char trunc = JSONL transcript writer. No DACMICU-owned subagent tool — LLM uses tintinweb's `Task` directly.
+- **popododo workflow-extension assessment**: closest existing thing to DACMICU's deterministic outer loop in Pi (~7K LOC, 6-stage state machine with transition guards), but single-dev/stale/opinionated. Lessons absorbed (state-machine + transition-guards works in Pi; `before_agent_start` for deferred compaction; header-injected state flag) but not as dependency.
+- **Custom code budget revised**: ~500 → ~1,400 LOC owned (revised earlier underestimate after re-examination). LLM-facing tools owned: just `signal_loop_success`. Soft-deps: tintinweb/pi-subagents (~6,082) + tintinweb/pi-manage-todo-list (~506) = ~6,588 LOC reused. Leverage ~4.7×.
+- Wiki updates:
+  - New: `dacmicu/research-2026-05-08-evening2-simplification.md` — full Q1-Q3 reasoning, project health table, v1 final architecture, what changed from evening 1.
+  - `dacmicu/concept.md` — package #6 framing updated to v1 simplification (tintinweb only, no `delegate()` tool, HazAT deferred).
+  - `ecosystem/subagents.md` — Hopsken=tintinweb correction added at top; project health table; subagent provider recommendations rewritten for v1 KISS plan.
+  - `ecosystem/todo-visualizations.md` — popododo proof-of-pattern section; idiomatic LLM-known TODO API shapes table.
+  - `index.md` — entries updated with evening-2 correction notes.
+
 ## [2026-05-08 evening, addendum] | Patterns deep-dive expanded inline in ecosystem/subagents.md
 - Expanded the four-pattern section from ~50 lines (capsule descriptions) to ~280 lines covering: how-it-works code sketch, what-you-get / what-you-give-up trade-offs, when-this-pattern-wins criteria, LOC characterization, and (for Pattern 3) a Hopsken component-LOC breakdown.
 - Added cross-pattern comparison table (11 dimensions × 4 patterns) and "why DACMICU ends up with two providers" closing argument.

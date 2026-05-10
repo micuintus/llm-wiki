@@ -140,6 +140,45 @@ If an extension matches one of these shapes, the LLM uses it correctly with **ze
 
 **For DACMICU we want the smaller idiomatic shape (`manage_todo_list`) plus our deterministic outer loop layered on top, not the larger one (`pi-tasks`) whose built-in DAG and file-backed sharing fight the loop driver.** See [research 2026-05-08 § Q2](../dacmicu/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension) for the full reasoning.
 
+## Existing deterministic outer-loop precedent: popododo's workflow-extension (proof-of-pattern, not a dependency)
+
+Re-research 2026-05-08 evening 2 surfaced one Pi extension that already implements a deterministic state-machine outer loop on top of TODOs: `popododo0720/pi-stuff/workflow-extension` (~7,000 LOC, 15 stars, single contributor, last push 2026-03-03 — stale 2 months).
+
+It enforces a 6-stage workflow (`Plan → Verify Plan → Implement → Verify Impl → Compound → Done`) with:
+
+- `set_todos` tool to declare the list at planning time
+- `transition.ts` enforcing stage-to-stage progression — write/edit tools are blocked outside the implementation stage
+- Per-TODO Implement → Verify → Compound cycles
+- `WORKFLOW_ACTIVE` header injected into every prompt turn for state detection
+- Automatic `before_agent_start` deferred compaction between TODO cycles (avoids tool-execution race)
+- Mandatory git/worktree gate as TODO #1 if dirty tree at start
+
+**This is the closest existing thing to DACMICU's deterministic outer loop in the Pi ecosystem**, and proves the pattern works. But:
+
+1. **It's a complete, opinionated workflow**, not a primitive. The 6-stage philosophy is hardcoded.
+2. **Single-dev, stale, niche.** Not a dependency target.
+3. **Coupling to the workflow stages** would force DACMICU to inherit the philosophy.
+
+**Conclusion: proof-of-pattern only, not a dependency.** DACMICU's deterministic outer loop (~150 LOC overlay in `@pi-dacmicu/todo`) is more general — outer loop reads any TODO list, validates each unchecked item, syncs state, works it. No mandatory plan/verify/compound stages.
+
+The lessons absorbed from popododo (without taking the code):
+
+- State-machine + transition-guards is a workable Pi pattern
+- `before_agent_start` is the right hook for deferred compaction (avoids tool-execution race)
+- Header-injected state flag is more reliable than session-entry parsing for state detection
+- TODO snapshot at planning time + sequential per-item cycles avoids re-planning churn
+
+## Idiomatic LLM-known TODO API shapes (2026-05-08 evening 2)
+
+LLMs are trained on Claude Code's `TodoWrite` and VSCode Copilot's `manage_todo_list`. Using either of these shapes costs **zero prompt tokens** to teach the model.
+
+| Idiomatic shape | Source | Pi package matching it |
+|---|---|---|
+| `TodoWrite({ todos: [{content, status, activeForm}] })` | Claude Code | none (verbatim) |
+| `manage_todo_list({ operation: "read"\|"write", todoList: [...] })` | VSCode Copilot Chat | **`tintinweb/pi-manage-todo-list`** (verbatim) |
+
+**Strongest argument for reusing tintinweb**: the LLM already knows `manage_todo_list` from training. Inventing a DACMICU-specific tool shape would burn prompt tokens explaining a non-standard shape. tintinweb gives us the LLM-native shape for free.
+
 ## Why no Pi extension matches Claude Code's `TodoWrite` polish
 
 Claude Code's `TodoWrite` is a **first-class built-in tool** with TUI rendering on every state change. The polish gap in the Pi ecosystem is **structural in the extensions, not in Pi itself** — Pi exposes everything needed; nobody has wired it up yet.
