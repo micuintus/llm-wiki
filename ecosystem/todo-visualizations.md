@@ -168,16 +168,28 @@ The lessons absorbed from popododo (without taking the code):
 - Header-injected state flag is more reliable than session-entry parsing for state detection
 - TODO snapshot at planning time + sequential per-item cycles avoids re-planning churn
 
-## Idiomatic LLM-known TODO API shapes (2026-05-08 evening 2)
+## Idiomatic LLM-known TODO API shapes (2026-05-08, verified evening 3)
 
-LLMs are trained on Claude Code's `TodoWrite` and VSCode Copilot's `manage_todo_list`. Using either of these shapes costs **zero prompt tokens** to teach the model.
+LLMs are trained on Claude Code's `TodoWrite` and VSCode Copilot's `manage_todo_list`. **Both shapes are training-known but they are NOT equivalent**.
 
-| Idiomatic shape | Source | Pi package matching it |
-|---|---|---|
-| `TodoWrite({ todos: [{content, status, activeForm}] })` | Claude Code | none (verbatim) |
-| `manage_todo_list({ operation: "read"\|"write", todoList: [...] })` | VSCode Copilot Chat | **`tintinweb/pi-manage-todo-list`** (verbatim) |
+| Field | Claude Code `TodoWrite` | VSCode Copilot `manage_todo_list` | tintinweb/pi-manage-todo-list |
+|---|---|---|---|
+| Tool name | `TodoWrite` | `manage_todo_list` | `manage_todo_list` |
+| Wrapper key | `todos` | `todoList` | `todoList` |
+| Item label | `content` | `title` | `title` |
+| Active form | `activeForm` (required) | (none) | (none) |
+| Status values | `pending` / `in_progress` / `completed` | (Copilot-specific) | `not-started` / `in-progress` / `completed` |
+| Operation flag | (none — single tool) | `operation: read\|write` | `operation: read\|write` |
+| Item id | (implicit by index) | — | `id: number` |
 
-**Strongest argument for reusing tintinweb**: the LLM already knows `manage_todo_list` from training. Inventing a DACMICU-specific tool shape would burn prompt tokens explaining a non-standard shape. tintinweb gives us the LLM-native shape for free.
+**tintinweb mirrors Copilot's shape verbatim.** It is NOT the Claude Code `TodoWrite` shape. Both are LLM-training-known idioms, but the model may have stronger priors for one or the other depending on which provider/model is in use:
+
+- Anthropic models (trained on Claude Code data) → stronger prior for `TodoWrite`
+- OpenAI/Copilot-tuned models → stronger prior for `manage_todo_list`
+
+**Practical implication for DACMICU**: prompt-token cost of using tintinweb's tool is **near-zero for any frontier model** that has seen Copilot training data, but **may not be the lowest-cost shape for a Claude Code-tuned model**. We accept this minor cost to avoid maintaining our own TODO state primitive. If profiling shows it's measurably worse for our Anthropic-model use case, the v1.x option is a thin shim that exposes Copilot's `manage_todo_list` to the model while internally translating to Claude Code's `TodoWrite` semantics.
+
+> **Earlier wiki claim correction (evening 3)**: previous text said tintinweb "mirrors Copilot ≈ Claude Code TodoWrite". The two are **different shapes**, not approximately equal. Wiki has been corrected.
 
 ## Why no Pi extension matches Claude Code's `TodoWrite` polish
 

@@ -43,15 +43,18 @@ The earlier framing in this doc treated `Hopsken/pi-subagents` (5,159 LOC) and `
 
 Canonical reference is **`tintinweb/pi-subagents`** (271 stars, 27 releases, 8 contributors, last push 2026-05-07). All references to "Hopsken" below should be read as the same package as tintinweb.
 
-## Project health (2026-05-08)
+## Project health (2026-05-08, live GitHub API)
 
-| Repo | Stars | Forks | Open issues | Releases | Contributors | Last push | Verdict |
-|---|---|---|---|---|---|---|---|
-| `nicobailon/pi-subagents` | 1,289 | 181 | 31 | 71 | 20 | 2026-05-03 | Most popular, very active, kitchen-sink |
-| **`HazAT/pi-interactive-subagents`** | **394** | 69 | **6** | **22** | **10** | 2026-04-20 | **Healthy, focused, well-maintained** |
-| **`tintinweb/pi-subagents`** (= Hopsken mirror) | 271 | 61 | 17 | 27 | 8 | 2026-05-07 | Healthy, mature, recent |
-| `tintinweb/pi-manage-todo-list` | 16 | 4 | 1 | — | small | active | Small but focused, single-author |
-| `popododo0720/pi-stuff` | 15 | 0 | 0 | — | 1 | 2026-03-03 | Single-dev, stale (2 months), niche — proof-of-pattern only, not a dependency target |
+| Repo | Stars | Forks | Open issues | Last push | Verdict |
+|---|---|---|---|---|---|
+| `nicobailon/pi-subagents` | 1,296 | 181 | 31 | 2026-05-03 | Most popular, very active, kitchen-sink |
+| **`HazAT/pi-interactive-subagents`** | **442** | 78 | **15** | 2026-05-03 | **Healthy, focused, well-maintained** |
+| **`tintinweb/pi-subagents`** (= Hopsken mirror) | 274 | 59 | 18 | 2026-05-07 | Healthy, mature, recent |
+| `tintinweb/pi-manage-todo-list` | 23 | 5 | 0 | 2026-04-30 | Small but focused, single-author |
+| `popododo0720/pi-stuff` | 16 | 0 | 0 | 2026-03-03 | Single-dev, stale (2+ months) — proof-of-pattern, not a dependency |
+| `tuansondinh/pi-fast-subagent` | 14 | 3 | 0 | 2026-04-28 | Small, in-process, lightly tested |
+| ~~`cmf/pi-subagent`~~ | **0** | 0 | 0 | 2026-01-08 | **Single-commit experiment, never published to npm — should NOT be ranked alongside production options** |
+| `Hopsken/pi-subagents` (private mirror) | 0 | 0 | 0 | 2026-03-26 | Stale snapshot of `@tintinweb/pi-subagents@0.5.2`; canonical upstream is at 0.7.1 |
 
 Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standard opencode-Tab-switch analog" — that comparison was based on a misunderstanding of opencode's UX. **Opencode itself has no tabs**; what it has is session cycling between full-screen views. The actual gap is narrower than previously claimed, and Pi has a *different* extension (`HazAT/pi-interactive-subagents`) that mirrors opencode's UX more closely via terminal multiplexer integration.
 
@@ -81,7 +84,7 @@ Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standa
 
 | Repo | LOC | Distinguishing features | Status |
 |---|---|---|---|
-| **`HazAT/pi-interactive-subagents`** | **8,227 (incl. tests)** | **Each subagent gets its own multiplexer pane.** Async non-blocking — `subagent()` returns immediately; widget shows live status (`starting`/`active`/`waiting`/`stalled`/`running`); result steered back as completion notification. Status from child-written runtime snapshots (not session-file polling). `caller_ping` (child→parent help request via session exit + parent resume). `/plan` workflow (Investigation→Planning→Review→Execute→Review). `/iterate` workflow (fork into subagent with full context). `subagent_interrupt` (turn-level cancel). | **Production, the only true opencode-equivalent UX in Pi.** |
+| **`HazAT/pi-interactive-subagents`** | **8,227 (incl. tests)** | **Each subagent gets its own multiplexer pane.** Async non-blocking — `subagent()` returns immediately; widget shows live phase (`starting`/`active`/`waiting`/`done` — verified 2026-05-08 evening 3 in `pi-extension/subagents/activity.ts`); result steered back as completion notification. Status from child-written runtime snapshots (not session-file polling). `caller_ping` (child→parent help request via session exit + parent resume). `/plan` workflow (Investigation→Planning→Review→Execute→Review). `/iterate` workflow (fork into subagent with full context). `subagent_interrupt` (turn-level cancel). | **Production, the only true opencode-equivalent UX in Pi.** |
 
 ### RPC-based (subprocess + JSON-RPC over stdin/stdout)
 
@@ -93,7 +96,7 @@ Supersedes earlier overclaim of "Hopsken's ConversationViewer is the gold-standa
 
 | Repo | LOC | Distinguishing features | Status |
 |---|---|---|---|
-| **`cmf/pi-subagent`** | **1,331** | **Library, not a user-facing extension.** Exports `invokeAgent`, `invokeAgentWithUI`, `registerSubagentRenderer`, `createProgressComponent`, `persistResults`, `discoverAgents`. Recursive step composition: `{cwd, agent, task}` / `{parallel: [...]}` / `{chain: [...]}` arbitrarily nested. Live tree-view UI with Braille spinners. Subprocess-based. | **Production, designed to be embedded.** |
+| ~~`cmf/pi-subagent`~~ | 1,331 | **CORRECTION (2026-05-08 evening 3): NOT production.** Single-commit experiment by one author (commit 2026-01-08), 0 stars, 0 forks, never published to npm. Code structure (recursive step composition, tree progress UI) is genuinely interesting as a *pattern reference*, but nobody depends on it and it has not been validated by use. Earlier wiki ranking was wrong. | Experimental — pattern reference only |
 
 ### Pi-core fork (not an extension)
 
@@ -308,7 +311,7 @@ const paneId = await mux.createPane({
 
 // Track liveness via runtime snapshots written by the child
 //   ~/.pi/sessions/<id>/runtime-state.json
-// Child writes: { status: "active"|"waiting"|"stalled"|"running", lastTurnAt, ... }
+// Child writes: { phase: "starting"|"active"|"waiting"|"done", lastTurnAt, ... }
 // Parent polls this file; correlates to its widget
 const activity = await readActivitySnapshot(sessionDir);
 
@@ -328,7 +331,7 @@ pi.sendMessage({
 - **Native multiplexer keybinds.** This is what users already know. No new UX to learn.
 - **No truncation anywhere.** It's a real pane — output is whatever the user's terminal shows.
 - **Async non-blocking by default.** `subagent()` tool returns immediately; parent keeps working. Result lands in parent context as a system-reminder when child finishes.
-- **Liveness is observable without a session-file diff.** The runtime-state snapshot pattern means parent sees `starting`/`active`/`waiting`/`stalled`/`running` cleanly.
+- **Liveness is observable without a session-file diff.** The runtime-state snapshot pattern means parent sees `starting`/`active`/`waiting`/`done` cleanly (4 phases, verified 2026-05-08 evening 3).
 
 #### What you give up
 
@@ -378,7 +381,7 @@ The earlier framing was "pick one provider, use it everywhere." That's wrong bec
 |---|---|---|---|
 | `@pi-dacmicu/ralph` | Mostly background; occasional check on a stuck iteration; one child at a time | **Pattern 3** (in-process modal) | **Hopsken** (or tintinweb superset) |
 | `@pi-dacmicu/evolve` | Foreground analytical; compare N candidates side-by-side; "why did B diverge from A?" | **Pattern 4** (mux pane per candidate) | **HazAT** |
-| Future programmatic embedding | Library-style, host extension owns the UI | **Pattern 1** wrapped as library | **cmf/pi-subagent** |
+| Future programmatic embedding | Library-style, host extension owns the UI | **Pattern 1** wrapped as library | ~~cmf/pi-subagent~~ (corrected: experimental, not production — see verification 2026-05-08 evening 3). No production-grade alternative; would need to write our own ~150-200 LOC if ever needed. |
 
 If evolve depends on Hopsken alone, the user hits the 500-char truncation wall the moment they want to inspect why candidate B diverged at turn 14. That truncation isn't a UX nicety — it kills the whole point of evolve.
 
@@ -422,7 +425,7 @@ So **opencode's actual UX is**: cycle between full-screen sessions via keybinds,
 | **Tool result truncation in viewer** | none | **500 chars** | **500 chars** | **none — full pane** | configurable `maxOutput` | configurable | none | none |
 | **Bash output truncation in viewer** | none | **500 chars** | **500 chars** | **none — full pane** | configurable | configurable | none | none |
 | **Read-only viewer / can interact** | interact (it's the active session) | read-only modal | read-only modal | **fully interactive** (it's a real `pi` session in a pane) | read-only | read-only | n/a | n/a |
-| **Status during execution** | session is foregrounded | agent-tree widget (Braille spinners) | same as Hopsken | always-visible widget + per-pane status snapshot (`starting`/`active`/`waiting`/`stalled`/`running`) | progress widget | live progress in chains/parallel | renderResult | tree progress UI |
+| **Status during execution** | session is foregrounded | agent-tree widget (Braille spinners) | same as Hopsken | always-visible widget + per-pane status snapshot (`starting`/`active`/`waiting`/`done`) | progress widget | live progress in chains/parallel | renderResult | tree progress UI |
 | **Steering mid-run** | yes (it's the foregrounded session) | `steer_subagent` LLM tool | same | `subagent_interrupt` (turn cancel) + interactive panes | no | no | no | no |
 | **Cross-extension RPC contract** | n/a | yes (`subagents:rpc:spawn`, scoped reply, `PROTOCOL_VERSION=2`) | yes | no (LLM tool only) | yes (extensive `pi.events`) | yes | no | exported library API |
 
@@ -434,7 +437,7 @@ So **opencode's actual UX is**: cycle between full-screen sessions via keybinds,
 | **Live updating modal viewer** | Hopsken / tintinweb | ConversationViewer modal with `session.subscribe`. Less keybind-friendly than opencode but live. |
 | **Full unrestricted text inspection** | **HazAT** (full pane) or **nicobailon** (JSONL transcripts on disk) | Hopsken/tintinweb truncate at 500 chars in their viewer. |
 | **Multi-agent comparison side-by-side** | **HazAT only** | Multiplexer panes coexist visually. No other Pi extension and not even opencode (which has no tabs/panes) does this. |
-| **Programmatic library to embed in another extension** | **cmf** | Designed for embedding; `invokeAgentWithUI` + tree progress UI returns rich results. |
+| **Programmatic library to embed in another extension** | none production-grade | ~~cmf~~ corrected — experimental, not in production use. Pattern is interesting but not a dependency target. |
 | **Sophisticated standalone TUI overlay (browse/edit/launch)** | @ifi | Multi-screen Agents Manager — closest to a full management UI in Pi. |
 
 ### Key insight: HazAT > opencode for parallel inspection
@@ -449,8 +452,8 @@ Read end-to-end on 2026-05-08 from `Hopsken/pi-subagents@main/src/ui/conversatio
 |---|---|
 | Modal overlay (`ctx.ui.custom`) with own keyboard handling | No keybind switch between agents (Esc → re-open via `/agents`) |
 | Live updates via `session.subscribe(() => tui.requestRender())` | Modal blocks parent view — can't see parent agent while open |
-| Full message log scroll (k/j/PgUp/PgDn/Home/End) | **Tool results truncated to 500 chars** (line 175) |
-| Streaming indicator at bottom (`▍ describeActivity(...)`) | **Bash output truncated to 500 chars** (line 191) |
+| Full message log scroll (k/j/PgUp/PgDn/Home/End) | **Tool results truncated to 500 chars** (line 209, verified 2026-05-08 evening 3) |
+| Streaming indicator at bottom (`▍ describeActivity(...)`) | **Bash output truncated to 500 chars** (line 221, verified 2026-05-08 evening 3) |
 | Header with status icon, duration, token count, tool count | Read-only — can't type, inject, steer from viewer |
 | ANSI-aware width adaptation (`wrapTextWithAnsi`) | One agent at a time — no side-by-side comparison |
 
@@ -499,10 +502,10 @@ After the user pushed back on growing complexity (per-consumer providers, multi-
 `@pi-dacmicu/subagent` remains dropped (decision from 2026-05-08 stands). Custom-building gives no architectural payoff because:
 
 1. Pi has **no native tab/workspace mechanism between AgentSessions** — `InteractiveMode` runs one session at a time. A real Tab-switch needs Pi core changes, not extension code. The architectural ceiling is Pi's, not the extension's.
-2. Three production-grade extensions already cover the trade-off space (Hopsken/tintinweb for in-process modal, HazAT for mux panes, cmf for embedded library).
+2. Two production-grade extensions cover the active trade-off space (tintinweb for in-process modal, HazAT for mux panes). The earlier wiki claim that "cmf/pi-subagent" is a third production option was wrong — see verification 2026-05-08 evening 3.
 3. Building our own would still hit the same ceiling.
 
-DACMICU consumes whichever provider best fits the consumer's UX needs, via cross-extension RPC contracts (Hopsken's `subagents:rpc:spawn`) or library imports (cmf's `invokeAgent`).
+DACMICU consumes tintinweb's production-grade extension via its `subagents:rpc:spawn` cross-extension RPC contract.
 
 ## Performance & quality science
 

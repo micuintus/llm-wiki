@@ -29,16 +29,16 @@ see_also:
 
 ## Build sequence
 
-Six packages, build in dependency order. Each step ends with a working `pi -e ./packages/<name>` invocation.
+**Updated 2026-05-08 evening 5**: `@pi-dacmicu/subagent` is dropped (per evening 2 simplification — see [research-2026-05-08-evening2](research-2026-05-08-evening2-simplification.md)). Now five packages plus a meta-package, build in dependency order.
 
 | Step | Package | Depends on | Done when |
 |---|---|---|---|
 | 1 | `@pi-dacmicu/base` | (Pi core only) | `pi -e ./packages/base` registers `signal_loop_success`; an `agent_end` listener attached via the exported `attachLoopDriver()` helper drives a manual test loop. |
 | 2 | `@pi-dacmicu/todo` | base | TODO tool reconstructs from `getBranch()`; `/todo-loop` command activates driven mode; loop terminates on `unchecked == 0`; survives `/compact` via `session_before_compact`. |
-| 3 | `@pi-dacmicu/subagent` | (none) | `spawn_agent` lifts the existing `examples/extensions/subagent/index.ts` patterns with parallel + chain modes; `ask_specialist` uses `ctx.modelRegistry.stream()` (verify pattern works first). |
+| 3 | ~~`@pi-dacmicu/subagent`~~ | — | **DROPPED** (evening 2). Use `tintinweb/pi-subagents` via `pi.events`-RPC instead. LLM uses tintinweb's `Agent` tool (Claude Code-idiomatic name) directly; no DACMICU subagent tool. |
 | 4 | `@pi-dacmicu/fabric` | (none) | `pi-callback` CLI installed on PATH; bash `tool_call` interceptor prepends `PI_CALLBACK_SOCKET=...` to commands; round-trip from a bash heredoc through socket back to `pi.sendMessage` works. |
-| 5 | `@pi-dacmicu/ralph` | base, subagent | `/ralph "<goal>"` command; per-iteration check optionally routes through subprocess subagent for fresh context; LLM-emitted `ralph_done` tool ends the loop. |
-| 6 | `@pi-dacmicu/evolve` | base, subagent | Repackages `examples/extensions/pi-evolve.ts` to consume base's `attachLoopDriver()` instead of registering its own `agent_end` listener; `init/run/log_experiment` + `signal_evolve_success` tools unchanged; ledger and git logic unchanged. |
+| 5 | `@pi-dacmicu/ralph` | base; **soft-dep on `tintinweb/pi-subagents`** | `/ralph "<goal>"` command; per-iteration check optionally spawns a tintinweb subagent for fresh context via `subagents:rpc:spawn`; degrades to inline (Variant A) if tintinweb absent; LLM-emitted `ralph_done` tool ends the loop. |
+| 6 | `@pi-dacmicu/evolve` | base; **soft-dep on `tintinweb/pi-subagents`** | Repackages `examples/extensions/pi-evolve.ts` (510 LOC verified) to consume base's `attachLoopDriver()` instead of registering its own `agent_end` listener; `init/run/log_experiment` + `signal_evolve_success` tools unchanged; ledger and git logic unchanged; adds JSONL transcript writer to work around Hopsken viewer's 500-char truncation; `HazAT/pi-interactive-subagents` integration deferred to v1.x. |
 
 ## What `@pi-dacmicu/base` exports
 
@@ -72,18 +72,19 @@ This consolidates the loop-driver pattern that is currently re-implemented per-e
 
 ## Hooks each package uses
 
-| Hook | base | todo | subagent | fabric | ralph | evolve |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `agent_end` | ✓ (orchestrator) | (via base) | | | (via base) | (via base) |
-| `before_agent_start` | ✓ (chains additions) | ✓ | | | ✓ | ✓ |
-| `session_before_compact` | ✓ (calls compactionSummary) | (via base) | | | (via base) | (via base) |
-| `session_start` / `session_tree` | | ✓ | | ✓ (socket bind) | | ✓ |
-| `session_shutdown` | ✓ (cleanup) | | | ✓ (socket close) | | |
-| `tool_call` (bash) | | | | ✓ (env+timeout) | | |
-| `pi.sendMessage(triggerTurn:true)` | ✓ (sole caller) | | | | | |
-| `pi.exec` | | | ✓ (subprocess) | | | ✓ (git) |
-| `pi.registerTool` | ✓ (`signal_loop_success`) | ✓ | ✓ | | ✓ (`ralph_done`) | ✓ |
-| `pi.registerCommand` | | ✓ (`/todo-loop`, `/todos`) | | | ✓ (`/ralph`) | ✓ (`/evolve`) |
+| Hook | base | todo | fabric | ralph | evolve |
+|---|:-:|:-:|:-:|:-:|:-:|
+| `agent_end` | ✓ (orchestrator) | (via base) | | (via base) | (via base) |
+| `before_agent_start` | ✓ (chains additions) | ✓ | | ✓ | ✓ |
+| `session_before_compact` | ✓ (calls compactionSummary) | (via base) | | (via base) | (via base) |
+| `session_start` / `session_tree` | | ✓ | ✓ (socket bind) | | ✓ |
+| `session_shutdown` | ✓ (cleanup) | | ✓ (socket close) | | |
+| `tool_call` (bash) | | | ✓ (env+timeout) | | |
+| `pi.sendMessage(triggerTurn:true)` | ✓ (sole caller) | | | | |
+| `pi.exec` | | | | | ✓ (git) |
+| `pi.events.emit("subagents:rpc:spawn")` | | | | ✓ (RPC client) | ✓ (RPC client) |
+| `pi.registerTool` | ✓ (`signal_loop_success`) | ✓ | | ✓ (`ralph_done`) | ✓ |
+| `pi.registerCommand` | | ✓ (`/todo-loop`, `/todos`) | | ✓ (`/ralph`) | ✓ (`/evolve`) |
 
 This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true)`, ensuring single-driver invariant.
 
@@ -95,9 +96,9 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 | `packages/coding-agent/examples/extensions/todo.ts` | TODO tool with state in tool-result `details`, branching-safe via `getBranch()` reconstruction, `/todos` UI component. |
 | `packages/coding-agent/examples/extensions/subagent/index.ts` | Subprocess invocation (`pi --mode json -p --no-session`), event parsing (`message_end`, `tool_result_end`), inline rendering with Pi's exported components, single/parallel/chain modes, abort handling. |
 | `packages/coding-agent/examples/extensions/plan-mode/index.ts` | The `agent_end` → `sendMessage({triggerTurn:false})` interactive variant; useful for ralph's interactive confirm-before-continue. |
-| `kostyay/agent-stuff/pi-extensions/loop.ts` (ecosystem) | `wasLastAssistantAborted` helper pattern, condition-summarization for status widget, single-active-loop guard. |
-| `tmustier/pi-extensions/pi-ralph-wiggum` (ecosystem) | Pause/resume via session state, max-iteration cap pattern. |
-| `latent-variable/pi-auto-continue` (ecosystem) | `setTimeout(..., 0)` defer trick to let agent settle into idle before injecting next message. |
+| `mitsuhiko/agent-stuff/extensions/loop.ts` (ecosystem) | `wasLastAssistantAborted` helper pattern (line 201-205), single-active-loop guard with confirm dialog (line 359). **Path corrected evening 4**: was `kostyay/agent-stuff/pi-extensions/loop.ts` — wrong both in author and path. |
+| ~~`tmustier/pi-extensions/pi-ralph-wiggum`~~ | **REMOVED evening 4**. Wiki claimed pause/resume + max-iteration cap; verification showed neither exists in the repo. Keep only as a generic ralph-loop reference, not for these patterns. |
+| `latent-variable/pi-auto-continue` (ecosystem) | `setTimeout(...)` defer trick (verified line 52-55) to let agent settle into idle before injecting next message. Subscribes `agent_end`, calls `pi.sendUserMessage(text)`. Hard cap of 100 iterations. Disables on `ctx.signal?.aborted` (Escape). |
 
 ## Open issues to resolve during build
 
@@ -112,16 +113,20 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 ## Estimated effort
 
-Total: ~1700 LOC across six packages. Roughly 2-3 days for a proficient Pi extension developer working from `pi-evolve.ts` as the reference.
+**Updated evening 5**: total ~1,400 LOC across five packages (subagent dropped). Roughly 2-3 days for a proficient Pi extension developer working from `pi-evolve.ts` as the reference.
 
 | Package | LOC | Notes |
 |---|---|---|
-| base | ~150 | Mostly the `attachLoopDriver` orchestrator + `signal_loop_success` tool |
-| todo | ~250 | Lifts most logic from `examples/extensions/todo.ts` (~290 LOC) and adds the loop driver |
-| subagent | ~400 | Lifts most logic from `examples/extensions/subagent/index.ts` (~700 LOC) but drops scope discovery (use single-agent default), keeps modes |
+| base | ~200 | `attachLoopDriver` orchestrator + `signal_loop_success` tool + `session_before_compact` preservation. Up from ~150 to account for proper testing scaffolding. |
+| todo | ~250 | Lifts most logic from `examples/extensions/todo.ts` (297 LOC verified) and adds the loop driver + reassessment step + snapshot renderer. |
+| ~~subagent~~ | — | **Dropped evening 2.** `tintinweb/pi-subagents` (soft-dep) handles this. |
 | fabric | ~250 | Socket server + bash interceptor + system-prompt fragment + 50-LOC CLI |
-| ralph | ~150 | Thin: `/ralph` command, breakout tool, optional subagent dispatch |
-| evolve | ~500 | Lift `pi-evolve.ts` (510 LOC) almost as-is; refactor agent_end to base's helper |
+| ralph | ~200 | `/ralph` command, breakout tool, optional tintinweb subagent dispatch via `subagents:rpc:spawn` RPC, fallback to inline. |
+| evolve | ~600 | Lift `pi-evolve.ts` (510 LOC verified) almost as-is; refactor `agent_end` to base's helper; add ~50 LOC JSONL transcript writer for evolve candidate inspection (works around Hopsken viewer's 500-char truncation). |
+| **Total owned** | **~1,500** | Plus ~10 LOC `@pi-dacmicu/all` meta-package |
+| Reused via soft-deps | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. ~4.4× leverage. |
+
+> **Note on `examples/extensions/subagent/index.ts`**: actual LOC is **987**, not the ~700 cited in earlier wiki. Order-of-magnitude unchanged but reference for own subagent build (if ever needed) was understated.
 
 ## Cross-references
 

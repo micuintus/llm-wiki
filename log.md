@@ -1,5 +1,26 @@
 # Wiki Log
 
+## [2026-05-08 evening 5] deep plan review | applied evening 4's corrections to plan docs + new verification findings
+- User asked for an in-depth review of ALL DACMICU plan assumptions. This is a follow-up to evening 4's audit (which found 4 false claims but did NOT apply the corrections to `implementation-plan.md` or `modular-architecture.md`).
+- **Discovery**: evening 4 documented 4 false claims + 3 follow-up actions but never applied them. Both plan docs still contained the dropped `@pi-dacmicu/subagent` package, false tmustier pause/resume claim, false davebcn87 setWidget claim, wrong kostyay path, and stale LOC budget.
+- **Applied evening 4 corrections to plan docs (now committed)**:
+  - `implementation-plan.md`: build sequence 6→5 packages (subagent dropped); tmustier removed for pause/resume; kostyay→mitsuhiko path corrected; LOC budget reconciled to ~1,500 across 5 packages with leverage ratio shown; hooks-matrix updated; subagent column removed.
+  - `modular-architecture.md`: davebcn87→tintinweb production reference for setWidget factory; status-widget tmustier reference flagged for re-survey; correction notes added inline.
+- **New evening-5 verification findings** (beyond evening 4's 46):
+  - `examples/extensions/subagent/index.ts` is **987 LOC**, not the ~700 cited in earlier wiki. Order-of-magnitude unchanged but reference for own-build (if ever needed) was understated by ~40%.
+  - `latent-variable/pi-auto-continue` verified end-to-end (`src/index.ts:52-55`): `setTimeout(...)` defer pattern + `pi.sendUserMessage(text)` on `agent_end` + 100-iteration cap + `ctx.signal?.aborted` disable. Earlier wiki had cited this correctly with the right author; just hadn't been verified.
+  - **HazAT activity phases reconciliation**: SubagentActivityPhase enum has 4 values (`starting`/`active`/`waiting`/`done`); README documents 5 widget labels including `stalled` (watchdog-derived) and `running` (Claude-fallback). Both earlier claims (5 in original wiki, 4 in evening 3 correction) were partial truths. Accurate framing: 4-value enum + 2 derived display labels = 5 user-visible labels.
+  - HazAT tool surface (`subagent`/`subagent_interrupt`/`subagents_list`/`subagent_resume` + subagent-only `caller_ping`) and slash commands (`/plan`, `/iterate`, `/subagent`) confirmed real per README.
+  - tintinweb's `subagents:rpc:ping` returns `{ version: PROTOCOL_VERSION }` for runtime version checks. PROTOCOL_VERSION = 2. Good API discipline signal — DACMICU's RPC client should ping on startup and refuse on mismatch.
+  - tintinweb master HEAD (v0.7.1) still pins `@mariozechner/*` peer-deps. Pi rebrand to `@earendil-works/*` underway. Both scopes currently published. Risk: if `@mariozechner/*` retires before tintinweb releases an updated peer-dep, our soft-dep breaks. Mitigation: monitor + document side-by-side install.
+- **Internal-consistency check across DACMICU plan docs**: all five major docs (concept, implementation-plan, modular-architecture, evening 2, evening 4 audit) now reference the same architecture within rounding tolerance.
+- **Runtime tests queued**: 8 from evening 4 (T1-T8) + 3 new from evening 5 (T9-T11) = 11 total before shipping v1.
+- Wiki updates:
+  - New: `dacmicu/research-2026-05-08-evening5-deep-plan-review.md` — full review with applied corrections, new verifications, internal-consistency check, outstanding gaps.
+  - `dacmicu/implementation-plan.md` — build sequence + reference impls + LOC + hooks matrix all corrected.
+  - `dacmicu/modular-architecture.md` — production setWidget reference corrected; tmustier flagged.
+  - `index.md` — entry added.
+
 ## [2026-05-08 evening 4] comprehensive audit | ALL 46 assumptions verified; 4 false, 1 unverified, 41 confirmed
 - User requested in-depth review of ALL DACMICU plans and assumptions. Conducted systematic verification across 8 categories against primary sources (live source code, GitHub API, npm registry, Pi docs).
 - **46 assumptions checked total**: 41 confirmed, 4 false, 1 unverified.
