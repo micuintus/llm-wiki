@@ -33,7 +33,8 @@ Catalog of compiled pages for the pi-mono project.
 
 ### Archive — research history
 Full decision trail, verification passes, corrections, scale-down explorations, critical reviews:
-- **[Critical Plan Review (2026-05-10)](dacmicu/archive/research-2026-05-10-critical-plan-review.md)** — Deliberately hostile reading of the entire plan. 11 assumptions challenged. Key findings: "deterministic" overstated; reassessment unvalidated; evolve should be removed from v1; estimate 3-5× too low. **Read this before building.**
+- **[Deep Implementation Review (2026-05-10)](dacmicu/archive/research-2026-05-10-deep-implementation-review.md)** — Primary-source verification of every load-bearing implementation claim. **2 CRITICAL findings**: pi-callback `wait:true` deadlocks by design; TODO state lost on compaction (silent breakage of central feature). 6 HIGH findings: nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID-not-result, single-driver invariant unenforced, etc. **Plan is not ready to build — needs redesign.**
+- [Critical Plan Review (2026-05-10)](dacmicu/archive/research-2026-05-10-critical-plan-review.md) — Hostile reading of the plan structure. 11 assumptions challenged. User overrode scope reduction (evolve + fabric stay).
 - [Verification Audit (2026-05-10)](dacmicu/archive/research-2026-05-10-comprehensive-verification-audit.md) — 70 claims checked, 17 false. pi-evolve provenance correction.
 - [archive/](dacmicu/archive/) — All sessions (evening 2–6) and prior audits.
 

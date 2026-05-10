@@ -25,7 +25,7 @@ see_also:
 
 # DACMICU implementation plan for Pi
 
-> **WARNING: This plan has been critically reviewed.** See [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) for a deliberately hostile reading that challenges every load-bearing assumption. Key findings: "deterministic" is overstated; reassessment step is unvalidated; evolve should be removed from v1; the "2-3 days" estimate is 3-5× too low. This page preserves the original plan for reference; consider the critique before building.
+> **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design; (2) TODO state is lost on compaction — silently breaking the central deterministic-loop feature on any long workflow. The plan needs **redesign**, not just adjustments. 6 additional HIGH-severity findings (nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID not result, single-driver invariant unenforced, etc.) plus the prior critical review findings.
 
 > The single-extension design previously committed here has been replaced by the modular six-package monorepo described in [modular-architecture](modular-architecture.md). This page now serves as the build sequencing plan against that architecture.
 
