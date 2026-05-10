@@ -32,7 +32,7 @@ see_also:
 
 Supersedes the single-extension decision in [implementation-plan](implementation-plan.md). DACMICU ships as a modular monorepo of six small Pi packages with a small shared runtime library. The umbrella framing from [concept](concept.md) survives as architecture; the deliverable is six focused, composable packages.
 
-> **Post-critique v1 scope**: base (internal module) + todo + ralph only. ~400 LOC. 1-2 weeks. See implementation-plan for revised estimates.
+> **Post-critique v1 scope**: User overrode the critique's scope reduction. Final v1: base (internal module) + todo + ralph + evolve + fabric. ~1,350 LOC. 2-4 weeks. See implementation-plan for user response and revised estimates.
 
 ## The six packages
 

@@ -228,10 +228,12 @@ FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/
 
 This page is a **living document**. For the full research history (decision process, verification passes, corrections, scale-down explorations):
 
+- [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) — Critical review of the entire plan. 11 assumptions challenged. **User overrode the review's scope reduction**: evolve and fabric stay in v1.
 - [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked, 17 false, 10 need update. Includes pi-evolve provenance correction.
 - [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
 
 **Significant revisions**:
+- 2026-05-10: User confirmed v1 scope: base + todo + ralph + evolve + fabric. Evolve is a key feature (build from scratch). Fabric confirmed from opencode experience. Ralph is thin wrapper around base.
 - 2026-05-10: Added deterministic TODO loop section (check → update → work). Added TODO base decision (tintinweb/pi-manage-todo-list vs edxeth/pi-tasks).
 - 2026-05-10: Corrected pi-evolve provenance (local draft, not upstream reference). Removed inline research references.
 - 2026-05-08: Dropped `@pi-dacmicu/subagent` (reuse tintinweb instead). Added npm rebrand note.

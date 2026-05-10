@@ -119,24 +119,36 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 **Original plan**: ~1,500 LOC across five packages. Claimed 2-3 days.
 
-**Revised honest estimate**: ~400-600 LOC for a minimal v1 (base + todo + ralph, no evolve/fabric). **1-2 weeks** for a proficient Pi extension developer, including integration testing, edge cases, and documentation.
+**Revised honest estimate**: ~1,400-1,600 LOC for v1 (base + todo + ralph + evolve + fabric). **2-4 weeks** for a proficient Pi extension developer, including integration testing, edge cases, and documentation. See User Response below for priority decisions.
 
 | Package | Original LOC | Revised LOC | Revised Notes |
 |---|---|---|---|
-| base | ~200 | ~100 | Internal module (not standalone package). `attachLoopDriver` + `signal_loop_success` + compaction preservation. |
+| base | ~200 | ~150 | Internal module (not standalone package). `attachLoopDriver` + `signal_loop_success` + compaction preservation. |
 | todo | ~250 | ~200 | Loop driver + widget + `/todo-loop`. **Reassessment optional (default: off)** — reduces complexity and token cost. |
 | ~~subagent~~ | — | — | Dropped. |
-| fabric | ~250 | — | **Deferred** — independent capability, not v1 requirement. |
-| ralph | ~200 | ~100 | Thin wrapper/configurator. Consider depending on existing ecosystem extensions instead of rebuilding. |
-| evolve | ~600 | — | **Removed from v1** — unvalidated requirement, no upstream prototype, highest risk. |
-| **Total v1** | **~1,500** | **~400** | Plus ~10 LOC meta-package. |
+| fabric | ~250 | ~250 | User confirmed: tried in opencode, wants it. Socket server + bash interceptor + CLI. |
+| ralph | ~200 | ~150 | Thin wrapper around DACMICU base. Flexible: Variant A (in-session) or Variant B (subagent via tintinweb). |
+| evolve | ~600 | ~600 | **User confirmed: key feature.** Build from scratch. MATS loop, git branches, `selection.md` ledger, Variant B via tintinweb. |
+| **Total v1** | **~1,500** | **~1,350** | Plus ~10 LOC meta-package. |
 | Reused via soft-deps | ~6,600 | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. |
 
-**Why the original estimate was wrong**: It assumed "lift existing code" would be fast. But the existing code is either unverified drafts (pi-evolve.ts), demo-quality examples (todo.ts has no widget/loop driver), or ecosystem extensions with different semantics (mitsuhiko's loop has no reassessment). Integration testing, `/fork`/`/compact`/`/reload` edge cases, and real TUI testing consume most of the time — not the initial code writing.
+**Why the original "2-3 days" estimate was wrong**: It assumed "lift existing code" would be fast. But the existing code is either unverified drafts (pi-evolve.ts), demo-quality examples (todo.ts has no widget/loop driver), or ecosystem extensions with different semantics. Integration testing, `/fork`/`/compact`/`/reload` edge cases, and real TUI testing consume most of the time — not the initial code writing.
 
-**Build priority**: `base` → `todo` → integration tests → `ralph` (if time). Skip `evolve` and `fabric` for v1.
+**Build priority**: `base` → `todo` → `fabric` → `ralph` → `evolve` → integration tests.
 
-> **Note on `examples/extensions/subagent/index.ts`**: actual LOC is **987**, not the ~700 cited in earlier wiki.
+## User Response to Critical Review (2026-05-10)
+
+The user reviewed the critical plan review and made three priority decisions:
+
+1. **Ralph**: Keep as thin wrapper around DACMICU base. Must be flexible to run in-session (Variant A) or on top of configured subagent infrastructure (Variant B). Not a standalone reimplementation — leverage the shared loop driver.
+
+2. **Evolve**: Keep. This is a key feature the user wants to build. The lack of an upstream prototype is acknowledged; it will be built from scratch consuming base's `attachLoopDriver()`.
+
+3. **Fabric**: Keep. User has already tried FABRIC-style composition in opencode and confirmed it works well. Wants it in Pi.
+
+These decisions override the critical review's recommendations to remove evolve and defer fabric. The risk warnings from the critique remain valid (subagent RPC stability, evolve LOC estimate, reassessment unvalidated) but the scope is what the user wants.
+
+**Revised v1 scope**: base + todo + ralph + evolve + fabric. ~1,350 LOC. 2-4 weeks.
 
 ## Cross-references
 

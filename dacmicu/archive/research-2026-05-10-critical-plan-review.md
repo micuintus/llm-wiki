@@ -296,6 +296,22 @@ These are assumptions the plan makes without evidence. Each is a potential proje
 
 ---
 
+## User Response (2026-05-10)
+
+The user reviewed this critique and made three explicit priority decisions that override the review's recommendations:
+
+1. **Ralph: Keep as thin wrapper around DACMICU base.** Must leverage the shared loop infrastructure. Flexible to run in-session (Variant A) or on top of configured subagent infrastructure (Variant B). Not a standalone reimplementation.
+
+2. **Evolve: Keep. This is a key feature the user wants to build.** The lack of an upstream prototype and the high-risk assessment are acknowledged. Build from scratch consuming base's `attachLoopDriver()`.
+
+3. **Fabric: Keep. User has tried FABRIC-style composition in opencode and confirmed it works well.** Wants it in Pi. Independent capability, but included in v1.
+
+These decisions restore `evolve` and `fabric` to v1 scope. The risk warnings in this review remain valid (subagent RPC stability, evolve LOC uncertainty, reassessment unvalidated, estimate too low) but the build scope is what the user wants.
+
+**Final v1 scope**: base + todo + ralph + evolve + fabric. ~1,350 LOC. 2-4 weeks.
+
+---
+
 ## Summary of Critical Findings
 
 | Finding | Severity | Recommendation |
