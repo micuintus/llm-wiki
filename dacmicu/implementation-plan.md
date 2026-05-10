@@ -1,7 +1,7 @@
 ---
 title: DACMICU implementation plan for Pi
 type: decision
-updated: 2026-05-08
+updated: 2026-05-10
 sources:
   - "concept.md"
   - "modular-architecture.md"

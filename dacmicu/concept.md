@@ -1,7 +1,6 @@
 ---
 title: DACMICU — concept
 type: concept
-updated: 2026-05-08
 sources:
   - ~/.pi/agent/sessions/--Users-michael.voigt-devel-AI-aiAgentResearch-agents-pi-mono--/2026-04-17T13-29-34-211Z_019d9ba1-ef03-7425-ab23-be00d42dde15.jsonl
   - https://github.com/anomalyco/opencode/pull/20074

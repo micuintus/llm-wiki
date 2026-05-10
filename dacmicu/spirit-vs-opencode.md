@@ -1,7 +1,7 @@
 ---
 title: DACMICU — spirit vs opencode implementation
 type: synthesis
-updated: 2026-05-08
+updated: 2026-05-10
 sources:
   - "concept.md"
   - "implementation-plan.md"

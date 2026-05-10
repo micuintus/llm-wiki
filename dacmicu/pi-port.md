@@ -1,7 +1,7 @@
 ---
 title: pi-port
 type: concept
-updated: 2026-05-08
+updated: 2026-05-10
 sources:
   - "concept.md"
   - "modular-architecture.md"
@@ -131,5 +131,6 @@ Full ecosystem survey: [loop-extensions](../ecosystem/loop-extensions.md).
 
 For the full research history (decisions, verification passes, corrections):
 
+- [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) — Critical review: 11 assumptions challenged. User overrode scope reduction; evolve + fabric stay in v1.
 - [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked.
 - [archive/](archive/) — All research sessions.

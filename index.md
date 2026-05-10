@@ -29,7 +29,7 @@ Catalog of compiled pages for the pi-mono project.
 - [Implementation Plan](dacmicu/implementation-plan.md) — Build sequence: 5 packages, dependency order, reference implementations, open issues. *Updated: 2026-05-10*
 - [Modular Architecture](dacmicu/modular-architecture.md) — Package layout, dep DAG, module-isolation constraint, delivery strategies, verified primitives. *Updated: 2026-05-10*
 - [Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; why bash + `pi --print` is anti-pattern; subprocess + RPC for subagents. *Updated: 2026-05-10*
-- [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-08*
+- [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-10*
 
 ### Archive — research history
 Full decision trail, verification passes, corrections, scale-down explorations, critical reviews:

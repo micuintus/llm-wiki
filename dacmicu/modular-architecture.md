@@ -1,7 +1,7 @@
 ---
 title: DACMICU modular architecture
 type: decision
-updated: 2026-05-08
+updated: 2026-05-10
 sources:
   - "concept.md"
   - "implementation-plan.md"
