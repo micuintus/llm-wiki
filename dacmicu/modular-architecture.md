@@ -162,7 +162,7 @@ All listed primitives are verified against pi-mono source as of 2026-05-08.
 | base | `ctx.hasPendingMessages()` | types `core/extensions/types.ts:318` |
 | base | `ctx.signal?.aborted` for abort detection | `extensions.md`; subagent example `:339` |
 | base | `pi.registerTool` with `signal_loop_success` style | `extensions.md:77` |
-| todo | Tool result `details` for branching state | `examples/extensions/todo.ts` (state in details, reconstructed from `getBranch()` on `session_tree`) |
+| todo | File-backed state (`~/.pi/dacmicu/state/<session-id>.json`) for durable TODO state; session entries secondary | `readState`/`writeState` from `@pi-dacmicu/base` runtime. File survives `/compact`; entries provide LLM-visible history but are lost on compaction. |
 | todo | `pi.on("before_agent_start", ...)` returning `{systemPrompt}` for TODO context | `extensions.md:471-475` |
 | subagent-client | `pi.events.emit("subagents:rpc:spawn", {requestId, type, prompt, options})` + `pi.events.on("subagents:rpc:spawn:reply:${requestId}", ...)` | `Hopsken/pi-subagents/src/cross-extension-rpc.ts` exposes the contract. **DACMICU's only subagent integration point** — see [concept § Subagent build-vs-reuse decision](concept.md#subagent-build-vs-reuse-decision-2026-05-08). |
 | subagent (provider, reference) | Hopsken/tintinweb's `createAgentSession` + ConversationViewer + agent-tree widget | `Hopsken/pi-subagents/src/agent-runner.ts:240-345`, `src/ui/conversation-viewer.ts` (243 LOC), `src/ui/agent-widget.ts` (488 LOC). **We do not implement these — we depend on them.** |

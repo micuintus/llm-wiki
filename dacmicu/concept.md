@@ -98,6 +98,7 @@ All items done → loop terminates
   REASSESS turn completes → agent_end → CHECK → phase = WORK → inject work prompt for top item
   unchecked == 0 at any CHECK → stop
   ```
+  **Phase is persisted in the state file** alongside the TODO list. On `session_start` / reload, the driver reads the phase from the file and resumes correctly. Without this, a `/reload` mid-loop would lose phase and restart in an undefined state.
 - **TODO state is stored in a session-scoped file** (`~/.pi/dacmicu/state/<session-id>.json`). The file is the durable source of truth. Session entries (tool-result `details`) are secondary — they provide LLM-visible history but are **lost on compaction**. On `session_start`, the driver reads the file first, falls back to session-entry reconstruction for forks/new sessions.
 - **File-backed storage branches with `/fork` via session IDs.** Each session (including forks) gets a unique ID; the state file is keyed by ID. This gives per-branch isolation without the fragility of session-entry scanning.
 - **Session-entry persistence** (tool-result `details`) provides LLM-visible history but is **lost on compaction**. File-backed storage is the durable source of truth. Both are used: file for the driver, entries for the LLM.
@@ -229,13 +230,13 @@ const DRIVER_SENTINEL = "dacmicu:driver";
 export function attachLoopDriver(pi: ExtensionAPI, driver: LoopDriver): () => void {
   // Check if another driver is already active
   const branch = pi.sessionManager?.getBranch?.() || [];
-  const hasDriver = branch.some(e => e.type === "app" && e.customType === DRIVER_SENTINEL);
+  const hasDriver = branch.some(e => e.type === "custom" && e.customType === DRIVER_SENTINEL);
   if (hasDriver) {
     throw new Error(`Another DACMICU loop driver is already active. Detach it first.`);
   }
   
   // Register sentinel
-  pi.appendEntry({ type: "app", customType: DRIVER_SENTINEL, data: { driverId: driver.driverId } });
+  pi.appendEntry(DRIVER_SENTINEL, { driverId: driver.driverId });
   
   // Attach actual listener
   const off = pi.on("agent_end", async (event, ctx) => { ... });

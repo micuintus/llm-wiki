@@ -158,7 +158,7 @@ The user reviewed the critical plan review and made three priority decisions:
 
 These decisions override the critical review's recommendations to remove evolve and defer fabric. The risk warnings from the critique remain valid (subagent RPC stability, evolve LOC estimate, reassessment unvalidated) but the scope is what the user wants.
 
-**Revised v1 scope**: base + todo + ralph + evolve + fabric. ~1,350 LOC. 2-4 weeks.
+**Revised v1 scope**: base + todo + ralph + evolve + fabric. **~2,100 LOC.** 2-4 weeks.
 
 ## Cross-references
 

@@ -70,7 +70,7 @@ A 510-LOC draft was written during DACMICU planning at `examples/extensions/pi-e
 - `agent_end` listener with `ctx.hasPendingMessages()` guard, then `pi.sendMessage({customType, content, display:false}, {triggerTurn:true, deliverAs:"followUp"})`
 - `before_agent_start` returning `{ systemPrompt: event.systemPrompt + extra }` for per-turn loop context injection
 - `session_before_compact` returning `{ compaction: { summary, firstKeptEntryId, tokensBefore } }` for state preservation
-- `session_start` and `session_tree` listeners that reconstruct extension state from `ctx.sessionManager.getBranch()` over tool result `details`
+- `session_start` and `session_tree` listeners that reconstruct extension state from the session-scoped file (`~/.pi/dacmicu/state/<session-id>.json`), falling back to `ctx.sessionManager.getBranch()` over tool result `details` for legacy sessions
 - A `signal_evolve_success` tool the LLM can call to break out of the loop
 
 The modular `@pi-dacmicu/base` package extracts this pattern into a reusable `attachLoopDriver()` helper so todo, ralph, and evolve don't reimplement it three times.
