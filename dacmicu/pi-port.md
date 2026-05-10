@@ -61,9 +61,11 @@ Five reasons, each grounded in the verified pi-mono primitives:
 4. **Compaction stays honest.** `session_before_compact` lets the extension provide a custom summary that preserves the loop's breakout condition (verified: `pi-evolve.ts:486`).
 5. **The whole hook surface exists today.** Verified line-by-line against pi-mono source — see [modular-architecture — Verified Pi primitives](modular-architecture.md#verified-pi-primitives--what-each-package-uses).
 
-## Reference implementation in-tree
+## Reference implementations
 
-The canonical reference for the in-session driver pattern is `examples/extensions/pi-evolve.ts` (510 LOC). It implements every hook the pattern needs:
+The canonical **production** reference for the in-session driver pattern is `mitsuhiko/agent-stuff/extensions/loop.ts` (~250 LOC, 2,275 ⭐ repo). It implements the same hooks with `session_before_compact` preservation (the only extension in the ecosystem that does this correctly).
+
+A 510-LOC draft was written during DACMICU planning at `examples/extensions/pi-evolve.ts` (untracked at repo root, unverified). It implements the same hook patterns correctly but is **not an upstream reference** — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The draft's line numbers are accurate but confer no external validation.
 
 - `agent_end` listener with `ctx.hasPendingMessages()` guard, then `pi.sendMessage({customType, content, display:false}, {triggerTurn:true, deliverAs:"followUp"})`
 - `before_agent_start` returning `{ systemPrompt: event.systemPrompt + extra }` for per-turn loop context injection
@@ -77,13 +79,13 @@ The modular `@pi-dacmicu/base` package extracts this pattern into a reusable `at
 
 | Hook | Purpose | Verified at |
 |---|---|---|
-| `pi.on("agent_end", ...)` | Observe loop completion | `pi-evolve.ts:422`, `plan-mode:220` |
-| `pi.sendMessage({...}, {triggerTurn:true, deliverAs:"followUp"})` | Start next iteration | `pi-evolve.ts:449`; `core/agent-session.ts:1268-1295` |
-| `pi.on("before_agent_start", ...)` returning `{systemPrompt}` or `{message}` | Inject per-turn loop context | `pi-evolve.ts:460` |
-| `pi.on("session_before_compact", ...)` returning custom compaction | Preserve state across compaction | `pi-evolve.ts:486` |
-| `pi.on("session_start" / "session_tree", ...)` | Rehydrate state | `pi-evolve.ts:162-163`, `examples/extensions/todo.ts` |
-| `ctx.hasPendingMessages()` | Guard against double-firing | `pi-evolve.ts:424`; types `core/extensions/types.ts:318` |
-| `pi.registerTool` for the breakout tool | LLM-initiated stop | `pi-evolve.ts:401` (`signal_evolve_success`) |
+| `pi.on("agent_end", ...)` | Observe loop completion | `plan-mode/index.ts:220` |
+| `pi.sendMessage({...}, {triggerTurn:true, deliverAs:"followUp"})` | Start next iteration | `core/agent-session.ts:1268-1295` |
+| `pi.on("before_agent_start", ...)` returning `{systemPrompt}` or `{message}` | Inject per-turn loop context | `extensions.md:471-475` |
+| `pi.on("session_before_compact", ...)` returning custom compaction | Preserve state across compaction | `extensions.md:413` |
+| `pi.on("session_start" / "session_tree", ...)` | Rehydrate state | `examples/extensions/todo.ts` |
+| `ctx.hasPendingMessages()` | Guard against double-firing | types `core/extensions/types.ts:318` |
+| `pi.registerTool` for the breakout tool | LLM-initiated stop | `extensions.md:77` |
 | `pi.appendEntry(customType, data)` | Persist non-branching driver state | `extensions.md`, `runner.ts:277` |
 
 ## Validation by ecosystem
@@ -95,7 +97,7 @@ The in-session driver pattern is independently implemented in the wild by at lea
 - `tmustier/pi-extensions/pi-ralph-wiggum` — pause/resume via session state, max-iteration cap, `before_agent_start` system-prompt injection
 - `latent-variable/pi-auto-continue` — `setTimeout(..., 0)` defer trick to let agent settle into idle before injecting next message
 
-Plus the in-tree `examples/extensions/pi-evolve.ts` (510 LOC), which is the most complete reference.
+The 510-LOC draft at `examples/extensions/pi-evolve.ts` implements the same patterns but is untracked and unverified — not a reference, just a planning artifact.
 
 The subprocess + RPC alternative is implemented by:
 

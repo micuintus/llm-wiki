@@ -21,11 +21,15 @@ see_also:
 
 Lightweight MATS-style code-evolution extension for Pi. Built as a pure extension — zero core changes.
 
-**Status (2026-05-08):** This file is the **canonical in-tree reference** for the in-session DACMICU driver pattern. Every hook in [pi-port — Hook surface required](../dacmicu/pi-port.md#hook-surface-required-all-available) is exercised here with line numbers in [modular-architecture — Verified Pi primitives](../dacmicu/modular-architecture.md#verified-pi-primitives--what-each-package-uses). Will be repackaged as `@pi-dacmicu/evolve` consuming `@pi-dacmicu/base`'s `attachLoopDriver()` helper, replacing its own `agent_end` listener with the shared one. The tools (`init/run/log_experiment`, `signal_evolve_success`), git logic, and `selection.md` ledger stay unchanged.
+**Status (2026-05-10):** ⚠️ **PROVENANCE CORRECTION** — This document describes a **DACMICU draft prototype** written during planning (`examples/extensions/pi-evolve.ts`, untracked at repo root, created 2026-05-07). It is **NOT** a canonical upstream reference, NOT in-tree in pi-mono, and NOT validated by real use. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — completely unrelated. See [verification audit](../dacmicu/research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full correction.
+
+The draft's hook patterns (`agent_end`, `sendMessage`, `session_before_compact`, etc.) are correctly implemented and the cited line numbers are accurate, but the file was written **by** the planning process, not discovered **in** upstream code. Use `mitsuhiko/agent-stuff/extensions/loop.ts` as the canonical production reference for the driver pattern.
+
+This page is preserved as a design sketch for `@pi-dacmicu/evolve`, not as a reference implementation.
 
 ## File
 
-`examples/extensions/pi-evolve.ts` (510 LOC, in-tree)
+`examples/extensions/pi-evolve.ts` (510 LOC, **untracked draft at repo root** — not in pi-mono, not published, not validated)
 
 ## Architecture
 
@@ -166,9 +170,10 @@ pi --extension examples/extensions/pi-evolve.ts
 ## Cross-references
 
 - [ecosystem/evolve-systems](../ecosystem/evolve-systems.md) — survey of evolve systems; this is the first MATS-style Pi extension
-- [dacmicu/implementation-plan](../dacmicu/implementation-plan.md) — hook surface this extension uses
+- [dacmicu/implementation-plan](../dacmicu/implementation-plan.md) — hook surface this design sketch targets
 - [ecosystem/loop-extensions](../ecosystem/loop-extensions.md) — iteration extensions (complementary)
 - [implementations/pi-callback-extension](pi-callback-extension.md) — proposed Unix-socket callback for benchmark judgment
-- [concepts/deterministic-agent-control-mechanisms](../concepts/deterministic-agent-control-mechanisms.md) — 20-mechanism taxonomy this extension implements
+- [concepts/deterministic-agent-control-mechanisms](../concepts/deterministic-agent-control-mechanisms.md) — 20-mechanism taxonomy
 - [concepts/pi-extension-primitive-mapping](../concepts/pi-extension-primitive-mapping.md) — Bidirectional hook mapping
+- [dacmicu/research-2026-05-10-comprehensive-verification-audit](../dacmicu/research-2026-05-10-comprehensive-verification-audit.md) — provenance correction
 - MetaHarness [MATS proposal](../../../../MetaHarness/llm-wiki/proposals/mats.md) — theoretical basis

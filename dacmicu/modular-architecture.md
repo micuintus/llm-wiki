@@ -39,7 +39,7 @@ Supersedes the single-extension decision in [implementation-plan](implementation
 | 3 | ~~`@pi-dacmicu/subagent`~~ | — | — | **Dropped 2026-05-08.** Replaced by `pi.events`-RPC dependency on `Hopsken/pi-subagents` (or `tintinweb/pi-subagents`). Their `createAgentSession` + ConversationViewer + agent-tree widget + cross-extension RPC is ~10K LOC of production-validated code we'd otherwise reinvent. See [concept § Subagent build-vs-reuse decision](concept.md#subagent-build-vs-reuse-decision-2026-05-08). |
 | 4 | `@pi-dacmicu/fabric` | ~250 | none | Bash callback infrastructure. Unix socket + `pi-callback` CLI on PATH + bash env injection via `tool_call` interceptor. Closes the mid-step recursive judgment gap; serves shell-pipeline composition. |
 | 5 | `@pi-dacmicu/ralph` | ~200 | base; **runtime-soft `Hopsken/pi-subagents`** | Ralph-loop UX: `/ralph "<goal>"` command. Variant A (in-session) by default. Variant B (subagent-per-iteration) when Hopsken's RPC is available — emits `subagents:rpc:spawn` per iteration for fresh-context-per-check parity with opencode `oc check`. Graceful degrade if subagent provider absent. |
-| 6 | `@pi-dacmicu/evolve` | ~550 | base; **runtime-soft `Hopsken/pi-subagents`** | MATS-style code-evolution loop. Variant B consumer — each candidate evaluated in isolation via `subagents:rpc:spawn`. Variants on git branches `evolve/vN/<slug>`; `selection.md` ledger; `init/run/log_experiment` tools; `signal_evolve_success` breakout. Existing `examples/extensions/pi-evolve.ts` (510 LOC) is the prototype to repackage. |
+| 6 | `@pi-dacmicu/evolve` | ~550 | base; **runtime-soft `Hopsken/pi-subagents`** | MATS-style code-evolution loop. Variant B consumer — each candidate evaluated in isolation via `subagents:rpc:spawn`. Variants on git branches `evolve/vN/<slug>`; `selection.md` ledger; `init/run/log_experiment` tools; `signal_evolve_success` breakout. **No validated upstream prototype exists.** A 510-LOC draft was written during DACMICU planning (`examples/extensions/pi-evolve.ts`, untracked, unverified) — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2. Build from scratch.
 
 Dependency DAG:
 
@@ -151,15 +151,15 @@ All listed primitives are verified against pi-mono source as of 2026-05-08.
 
 | Package | Primitive | Verified at |
 |---|---|---|
-| base | `pi.on("agent_end", ...)` | `examples/extensions/pi-evolve.ts:422`, `packages/coding-agent/examples/extensions/plan-mode/index.ts:220` |
-| base | `pi.sendMessage({customType, content, display}, {triggerTurn:true, deliverAs:"followUp"})` | `pi-evolve.ts:449`; types `core/extensions/types.ts:372`; agent-session `core/agent-session.ts:1268-1295` |
-| base | `pi.on("session_before_compact", ...)` returning `{compaction:{summary, firstKeptEntryId, tokensBefore}}` | `pi-evolve.ts:486` |
-| base | `pi.on("session_start" / "session_tree", ...)` | `pi-evolve.ts:162-163`, `examples/extensions/todo.ts` |
-| base | `ctx.hasPendingMessages()` | `pi-evolve.ts:424`; types `core/extensions/types.ts:318` |
+| base | `pi.on("agent_end", ...)` | `packages/coding-agent/examples/extensions/plan-mode/index.ts:220` |
+| base | `pi.sendMessage({customType, content, display}, {triggerTurn:true, deliverAs:"followUp"})` | types `core/extensions/types.ts:372`; agent-session `core/agent-session.ts:1268-1295` |
+| base | `pi.on("session_before_compact", ...)` returning `{compaction:{summary, firstKeptEntryId, tokensBefore}}` | `extensions.md:413` |
+| base | `pi.on("session_start" / "session_tree", ...)` | `examples/extensions/todo.ts` |
+| base | `ctx.hasPendingMessages()` | types `core/extensions/types.ts:318` |
 | base | `ctx.signal?.aborted` for abort detection | `extensions.md`; subagent example `:339` |
-| base | `pi.registerTool` with `signal_loop_success` style | `pi-evolve.ts:401` |
+| base | `pi.registerTool` with `signal_loop_success` style | `extensions.md:77` |
 | todo | Tool result `details` for branching state | `examples/extensions/todo.ts` (state in details, reconstructed from `getBranch()` on `session_tree`) |
-| todo | `pi.on("before_agent_start", ...)` returning `{systemPrompt}` for TODO context | `pi-evolve.ts:460` |
+| todo | `pi.on("before_agent_start", ...)` returning `{systemPrompt}` for TODO context | `extensions.md:471-475` |
 | subagent-client | `pi.events.emit("subagents:rpc:spawn", {requestId, type, prompt, options})` + `pi.events.on("subagents:rpc:spawn:reply:${requestId}", ...)` | `Hopsken/pi-subagents/src/cross-extension-rpc.ts` exposes the contract. **DACMICU's only subagent integration point** — see [concept § Subagent build-vs-reuse decision](concept.md#subagent-build-vs-reuse-decision-2026-05-08). |
 | subagent (provider, reference) | Hopsken/tintinweb's `createAgentSession` + ConversationViewer + agent-tree widget | `Hopsken/pi-subagents/src/agent-runner.ts:240-345`, `src/ui/conversation-viewer.ts` (243 LOC), `src/ui/agent-widget.ts` (488 LOC). **We do not implement these — we depend on them.** |
 | subagent (provider, optional fallback) | `createAgentSession` directly (~400 LOC, no UI layer) | If Hopsken integration proves untenable. Last-resort fallback only — visibility/navigability lost. |
@@ -173,7 +173,7 @@ All listed primitives are verified against pi-mono source as of 2026-05-08.
 | fabric | `tool_call` event mutating `event.input.timeout` (no-timeout for `pi-callback`) | Same mechanism; `BashToolInput` includes `timeout?: number` |
 | fabric | Unix socket server in extension factory | Standard Node `net.createServer`; lifecycle hooks `session_start` / `session_shutdown` |
 | ralph | All of base + (optional) `subagent-client` for Variant B | (composition only) |
-| evolve | All of base + `subagent-client` (required for Variant B) + `pi.exec("git", [...])` | `pi-evolve.ts` uses `pi.exec` extensively |
+| evolve | All of base + `subagent-client` (required for Variant B) + `pi.exec("git", [...])` | `extensions.md:1474` |
 
 ## Open verification gaps
 

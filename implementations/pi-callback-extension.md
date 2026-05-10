@@ -300,9 +300,9 @@ done
 4. **Tool execution**: Should `pi-callback tool read file.txt` bypass the LLM (direct `pi.exec()`) or go through the agent? The sketch supports both via `type: "tool"`.
 5. **Nested callbacks**: If the agent's response triggers another bash tool that calls `pi-callback`, we need to prevent deadlocks.
 
-## Integration with pi-evolve
+## Integration with pi-evolve design sketch
 
-With `pi-callback`, the evolve benchmark script could be:
+With `pi-callback`, the evolve benchmark script (from the [pi-evolve draft](../implementations/pi-evolve-extension.md)) could be:
 
 ```bash
 #!/usr/bin/env bash

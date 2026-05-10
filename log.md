@@ -1,5 +1,52 @@
 # Wiki Log
 
+## [2026-05-10 evening] comprehensive verification audit completed
+
+User requested: (1) verify wiki consistency, (2) verify ALL assumptions, (3) assess plans in depth, (4) document.
+
+**Deliverable**: `dacmicu/research-2026-05-10-comprehensive-verification-audit.md` — 70 claims checked across 8 categories.
+
+### Key findings
+
+| Category | Checked | Correct | False | Needs Update |
+|---|---|---|---|---|
+| Pi Extension API primitives | 15 | 15 | 0 | 0 |
+| pi-evolve identity & provenance | 8 | 0 | 8 | 0 |
+| Ecosystem repo health | 12 | 8 | 2 | 2 |
+| Reference impl capabilities | 6 | 3 | 3 | 0 |
+| Cross-document consistency | 14 | 6 | 4 | 4 |
+| NPM scope rebrand | 5 | 5 | 0 | 0 |
+| Architecture assumptions | 6 | 4 | 0 | 2 |
+| Plan feasibility | 4 | 2 | 0 | 2 |
+
+**Critical finding**: `examples/extensions/pi-evolve.ts` is a DACMICU draft prototype written by this agent (2026-05-07), NOT an upstream reference. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — unrelated. GitHub `badlogic/pi-evolve` returns 404. Eight distinct wiki documents treated the local draft as a "canonical in-tree reference" with "verified line numbers."
+
+### Corrections applied to committed docs
+
+- `concept.md` — corrected evolve description (no validated upstream prototype)
+- `implementation-plan.md` — corrected build step 6, reference impls table, LOC table
+- `modular-architecture.md` — corrected "existing prototype" claim, replaced all `pi-evolve.ts:XXX` citations with pi-mono source references
+- `pi-port.md` — corrected "canonical reference" claim, updated hook surface table
+- `pi-evolve-extension.md` — added prominent provenance warning at top, corrected "in-tree" claim
+- `evening4-audit.md` — added errata note about recursive self-validation
+- `loop-extensions.md` — corrected pi-evolve-extension reference
+- `pi-callback-extension.md` — noted "design sketch" integration
+
+### Recommendations
+
+1. Fix all pi-evolve false claims (done in this session)
+2. Reconcile subagent provider (tintinweb vs HazAT for evolve) — needs user decision
+3. Standardize package count presentation — 5 vs 6 cosmetic inconsistency
+4. Re-verify repo health stats in fresh session
+5. Write architecture tests A1-A6 before build
+6. Decide scale-down (original / Option A / Option B) with corrected premises
+
+### What this supersedes
+
+- `evening4-comprehensive-audit.md` — contained recursive self-validation using pi-evolve.ts
+- `evening5-deep-plan-review.md` — claimed plan docs were "internally consistent" but missed pi-evolve provenance
+- `evening6-radical-scale-down.md` — drafted under context pressure with false pi-evolve premises
+
 ## [2026-05-10] verification slips on pi-evolve identity — session deferred to fresh start
 
 **STOP and read this before continuing any DACMICU planning.** Multiple verification failures discovered today.

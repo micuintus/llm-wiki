@@ -242,7 +242,7 @@ Variant D (branched sessions, rahulmutt-style) is the closest to Huntley's "lite
 - [ecosystem/claude-code-loop](claude-code-loop.md) — Claude Code's `/loop` (cron-scheduled, complementary)
 - [ecosystem/todo-visualizations](todo-visualizations.md) — TODO state machines that compose with these loops
 - [ecosystem/subagents](subagents.md) — broader subagent landscape
-- [implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — MATS-style branched-variant loop (Variant A + branching)
+- [implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — DACMICU design sketch for MATS-style branched-variant loop (510 LOC draft, untracked, unverified)
 - [implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — Proposed Unix-socket callback for bash orchestration
 
 ### MetaHarness wiki (research)

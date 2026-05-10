@@ -38,7 +38,7 @@ see_also:
 | 3 | ~~`@pi-dacmicu/subagent`~~ | — | **DROPPED** (evening 2). Use `tintinweb/pi-subagents` via `pi.events`-RPC instead. LLM uses tintinweb's `Agent` tool (Claude Code-idiomatic name) directly; no DACMICU subagent tool. |
 | 4 | `@pi-dacmicu/fabric` | (none) | `pi-callback` CLI installed on PATH; bash `tool_call` interceptor prepends `PI_CALLBACK_SOCKET=...` to commands; round-trip from a bash heredoc through socket back to `pi.sendMessage` works. |
 | 5 | `@pi-dacmicu/ralph` | base; **soft-dep on `tintinweb/pi-subagents`** | `/ralph "<goal>"` command; per-iteration check optionally spawns a tintinweb subagent for fresh context via `subagents:rpc:spawn`; degrades to inline (Variant A) if tintinweb absent; LLM-emitted `ralph_done` tool ends the loop. |
-| 6 | `@pi-dacmicu/evolve` | base; **soft-dep on `tintinweb/pi-subagents`** | Repackages `examples/extensions/pi-evolve.ts` (510 LOC verified) to consume base's `attachLoopDriver()` instead of registering its own `agent_end` listener; `init/run/log_experiment` + `signal_evolve_success` tools unchanged; ledger and git logic unchanged; adds JSONL transcript writer to work around Hopsken viewer's 500-char truncation; `HazAT/pi-interactive-subagents` integration deferred to v1.x. |
+| 6 | `@pi-dacmicu/evolve` | base; **soft-dep on `tintinweb/pi-subagents`** | New build (no validated upstream prototype). A 510-LOC draft exists locally but is untracked and unverified — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2. Tools (`init_experiment`, `run_experiment`, `log_experiment`, `signal_evolve_success`), git branch management, and `selection.md` ledger are designed from scratch. `agent_end` driver consumes base's `attachLoopDriver()`. JSONL transcript writer added for candidate inspection (works around Hopsken viewer's 500-char truncation). `HazAT/pi-interactive-subagents` integration deferred to v1.x. |
 
 ## What `@pi-dacmicu/base` exports
 
@@ -92,7 +92,7 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 | Source | What to take |
 |---|---|
-| `examples/extensions/pi-evolve.ts` | The whole `agent_end` driver pattern, `session_before_compact` summary shape, `before_agent_start` system-prompt injection, `session_start`/`session_tree` rehydration, `signal_evolve_success` breakout. Refactor to consume base's `attachLoopDriver()`. |
+| `examples/extensions/pi-evolve.ts` | **WARNING: this is a DACMICU draft prototype (untracked, unverified), NOT an upstream reference.** The file does contain correct patterns for `agent_end` driver, `session_before_compact`, `before_agent_start`, `session_start`/`session_tree` rehydration, and `signal_evolve_success` breakout — but these were written BY the planning process, not discovered in upstream code. Use `mitsuhiko/agent-stuff/extensions/loop.ts` as the canonical production reference for the driver pattern instead. See [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2.
 | `packages/coding-agent/examples/extensions/todo.ts` | TODO tool with state in tool-result `details`, branching-safe via `getBranch()` reconstruction, `/todos` UI component. |
 | `packages/coding-agent/examples/extensions/subagent/index.ts` | Subprocess invocation (`pi --mode json -p --no-session`), event parsing (`message_end`, `tool_result_end`), inline rendering with Pi's exported components, single/parallel/chain modes, abort handling. |
 | `packages/coding-agent/examples/extensions/plan-mode/index.ts` | The `agent_end` → `sendMessage({triggerTurn:false})` interactive variant; useful for ralph's interactive confirm-before-continue. |
@@ -113,7 +113,7 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 
 ## Estimated effort
 
-**Updated evening 5**: total ~1,400 LOC across five packages (subagent dropped). Roughly 2-3 days for a proficient Pi extension developer working from `pi-evolve.ts` as the reference.
+**Updated evening 5**: total ~1,400 LOC across five packages (subagent dropped). Roughly 2-3 days for a proficient Pi extension developer. **Note**: earlier drafts cited `pi-evolve.ts` as a reference — this is a local draft, not upstream code. Use `mitsuhiko/agent-stuff/extensions/loop.ts` as the canonical production reference for the driver pattern.
 
 | Package | LOC | Notes |
 |---|---|---|
@@ -122,7 +122,7 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 | ~~subagent~~ | — | **Dropped evening 2.** `tintinweb/pi-subagents` (soft-dep) handles this. |
 | fabric | ~250 | Socket server + bash interceptor + system-prompt fragment + 50-LOC CLI |
 | ralph | ~200 | `/ralph` command, breakout tool, optional tintinweb subagent dispatch via `subagents:rpc:spawn` RPC, fallback to inline. |
-| evolve | ~600 | Lift `pi-evolve.ts` (510 LOC verified) almost as-is; refactor `agent_end` to base's helper; add ~50 LOC JSONL transcript writer for evolve candidate inspection (works around Hopsken viewer's 500-char truncation). |
+| evolve | ~600 | New build — no validated upstream prototype. A 510-LOC draft exists locally (untracked, unverified) with the correct hook patterns but is not tested or production-ready. Design tools, ledger, and git logic from scratch; consume base's `attachLoopDriver()`; add ~50 LOC JSONL transcript writer for candidate inspection (works around Hopsken viewer's 500-char truncation). |
 | **Total owned** | **~1,500** | Plus ~10 LOC `@pi-dacmicu/all` meta-package |
 | Reused via soft-deps | ~6,600 | tintinweb/pi-subagents + tintinweb/pi-manage-todo-list. ~4.4× leverage. |
 

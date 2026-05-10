@@ -33,6 +33,8 @@ see_also:
 
 # Comprehensive audit — ALL DACMICU assumptions verified
 
+> **ERRATA (2026-05-10)**: This audit contains a methodological flaw. It lists `examples/extensions/pi-evolve.ts` as a primary "source" and uses it to validate 8 claims (Category 1 and 2). The file was later discovered to be a **DACMICU draft prototype written by this agent**, not an upstream reference. The line numbers are accurate but confer no external validation. See [research-2026-05-10-comprehensive-verification-audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full correction. The 46-assumption count is inflated by this recursive self-validation. Treat claims citing `pi-evolve.ts` as "confirmed" with caution — the Pi primitives themselves are real (verified against pi-mono source), but the draft's provenance was not checked.
+
 User requested a detailed review of ALL DACMICU plans and assumptions. This document is the result of a systematic end-to-end verification pass against primary sources (live source code, live GitHub API, live npm registry, Pi official docs).
 
 ## Audit methodology
