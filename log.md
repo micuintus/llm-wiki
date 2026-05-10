@@ -1,5 +1,64 @@
 # Wiki Log
 
+## [2026-05-10] verification slips on pi-evolve identity — session deferred to fresh start
+
+**STOP and read this before continuing any DACMICU planning.** Multiple verification failures discovered today.
+
+### Failure 1: claimed "in-tree" file is untracked
+
+`examples/extensions/pi-evolve.ts` (510 LOC) at the pi-mono repo root is **NOT tracked by pi-mono git**. It sits in an entirely untracked `examples/` directory at the repo root. Pi-mono's actual tracked extension examples live under `packages/coding-agent/examples/extensions/` and **none is named `pi-evolve.ts`**. Wiki claims of "in-tree at examples/extensions/pi-evolve.ts" across multiple plan docs are wrong — the file is local research artifact of unknown provenance.
+
+### Failure 2: cited GitHub repo doesn't exist
+
+Earlier wiki/research cited `github.com/badlogic/pi-evolve` with "7 stars, 1 fork, last push 2026-05-08, 510 LOC". Verified today via live GitHub API: that URL **returns HTTP 404**. `badlogic` (Mario Zechner) does exist on GitHub with 256 public repos including pi-share-hf, pi-diff-review, pi-skills, pi-doom, etc. — but no `pi-evolve` anywhere in his 100 most-recent pushes. The "verified stats" were search-engine-cached snippets treated as primary source — fabricated, not verified.
+
+### Failure 3: npm package is something else entirely
+
+Verified by `npm pack pi-evolve@0.1.0` and inspecting tarball contents:
+
+- **Real author**: "Dunya Kirkali" (per README; npm `author` field has just `"badlogic"` as username, dead `repository.url` to non-existent GitHub repo)
+- **Real description**: `/evolve` slash command for **brainstorming text alternatives** (titles, taglines, names) — generates 5 siblings, user picks one, iterate
+- **Real size**: 143 LOC single file `src/index.ts`
+- **Real peer-deps**: `@mariozechner/pi-coding-agent` (legacy scope, unmigrated)
+- **Real license**: MIT
+- **NOT IN THE PACKAGE**: MATS evolution loop, code generation, candidate scoring, git branches, ledger, multi-objective scoring, breakout signal, subagents, `agent_end` listeners — every framing element used in DACMICU planning around "pi-evolve as MATS foundation"
+
+The local 510-LOC file's provenance is **completely unknown**. It's not the npm package. It's not in pi-mono. It's not at the dead GitHub URL. Treat all wiki mentions of "pi-evolve foundation" as unverified until provenance is established.
+
+### Implications for the DACMICU plan
+
+The "evolve" downstream concern in the umbrella framing was built on a conflation of three different things treated as one:
+1. A 510-LOC local file of unknown origin (claimed in-tree, not in-tree; claimed from `badlogic/pi-evolve`, that repo doesn't exist)
+2. A dead GitHub URL with fabricated stars/push-date metadata
+3. An npm package that does something completely different (brainstorming siblings, not MATS evolution)
+
+Anything in the wiki citing "pi-evolve" needs re-examination. The session-6 scale-down draft (`research-2026-05-08-evening6-radical-scale-down.md`) was written assuming option 1 above is real and stable; that assumption no longer holds.
+
+### What's still safe
+
+The directly-verified-against-source primitives from earlier sessions remain solid:
+- Pi extension API (read from `dist/index.d.ts` and `extensions.md`)
+- tintinweb tool names + schema (read from `Hopsken/src/index.ts`)
+- ConversationViewer truncation lines (read from `conversation-viewer.ts`)
+- HazAT activity phase enum (read from `activity.ts`)
+- pi-mono rebrand commits `551385e4`, `3e5ad67e` (read from git log)
+- pi-auto-continue defer trick lines 52-55 (read from `src/index.ts`)
+- `manage_todo_list` schema (read from `src/tool.ts`)
+
+Anything else cited as "verified" with star counts, fork counts, push dates, or repo metadata: **re-check against live API in a fresh session**.
+
+### Concrete next-session actions
+
+1. Establish provenance of `examples/extensions/pi-evolve.ts` (510 LOC). Ask user. Or grep the file's distinctive strings against GitHub search.
+2. Re-verify EVERY repo health stat in the wiki via live GitHub API (no search-cached numbers).
+3. Re-verify EVERY "pi-evolve" cross-reference against the tarball-verified reality (143 LOC brainstorm tool by Dunya Kirkali, NOT MATS evolution).
+4. Decide DACMICU scale-down (Option A / B / original) with fresh rigor against primary sources.
+5. Wiki log this entry stays as the bookmark for what was wrong.
+
+### Commits this session
+
+- This log entry only. No plan-doc edits committed (concept.md, implementation-plan.md, modular-architecture.md unchanged from `908e2d1`). Evening 6 doc kept in working tree as DRAFT for next session.
+
 ## [2026-05-08 evening 5] deep plan review | applied evening 4's corrections to plan docs + new verification findings
 - User asked for an in-depth review of ALL DACMICU plan assumptions. This is a follow-up to evening 4's audit (which found 4 false claims but did NOT apply the corrections to `implementation-plan.md` or `modular-architecture.md`).
 - **Discovery**: evening 4 documented 4 false claims + 3 follow-up actions but never applied them. Both plan docs still contained the dropped `@pi-dacmicu/subagent` package, false tmustier pause/resume claim, false davebcn87 setWidget claim, wrong kostyay path, and stale LOC budget.
