@@ -178,6 +178,6 @@ Total estimate: 1-2 days of focused work for a proficient Pi extension developer
 - [research-2026-05-08-evening5-deep-plan-review](research-2026-05-08-evening5-deep-plan-review.md) — surfaced the gap between claimed and actual new code
 - [research-2026-05-08-evening4-comprehensive-audit](research-2026-05-08-evening4-comprehensive-audit.md) — original 46-assumption audit
 - [research-2026-05-08-evening2-simplification](research-2026-05-08-evening2-simplification.md) — KISS framing that this builds on
-- [concept](concept.md) — top-level framing (now updated)
-- [implementation-plan](implementation-plan.md) — build sequencing (now updated)
-- [modular-architecture](modular-architecture.md) — package layout (now superseded for v1; old framing kept for history)
+- [concept](../concept.md) — top-level framing (now updated)
+- [implementation-plan](../implementation-plan.md) — build sequencing (now updated)
+- [modular-architecture](../modular-architecture.md) — package layout (now superseded for v1; old framing kept for history)

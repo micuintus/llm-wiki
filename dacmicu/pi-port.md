@@ -114,7 +114,7 @@ Full ecosystem survey: [loop-extensions](../ecosystem/loop-extensions.md).
 - [implementation-plan](implementation-plan.md) — build sequence against the modular architecture
 - [spirit-vs-opencode](spirit-vs-opencode.md) — what we keep, what we drop, what we replace
 - [../implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — the FABRIC package design (closes the recursive self-reach gap)
-- [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — canonical in-tree reference; will be repackaged as `@pi-dacmicu/evolve`
+- [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — design sketch for `@pi-dacmicu/evolve` (draft, not validated)
 - [../architecture/loop-internals](../architecture/loop-internals.md) — line-precise walk-through of pi's inner loop
 - [../architecture/subprocess-rpc-rendering](../architecture/subprocess-rpc-rendering.md) — the visibility-preserving subagent pattern
 - [../architecture/steering-vs-followup](../architecture/steering-vs-followup.md) — why `triggerTurn:true` + `deliverAs:"followUp"` is the correct loop-driver primitive
@@ -124,3 +124,12 @@ Full ecosystem survey: [loop-extensions](../ecosystem/loop-extensions.md).
 ### MetaHarness wiki (research)
 - [MATS](../../../../MetaHarness/llm-wiki/proposals/mats.md) — research proposal this implementation serves
 - [Deterministic Agent Loops](../../../../MetaHarness/llm-wiki/concepts/deterministic-agent-loops.md) — Pi hooks in the broader landscape
+
+---
+
+## History & audit trail
+
+For the full research history (decisions, verification passes, corrections):
+
+- [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked.
+- [archive/](archive/) — All research sessions.

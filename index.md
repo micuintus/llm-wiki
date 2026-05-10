@@ -21,16 +21,20 @@ Catalog of compiled pages for the pi-mono project.
 - [Thinking Display](config/thinking-display.md) — How thinking blocks render across providers. *Updated: 2026-04-29*
 
 ## DACMICU
-- [DACMICU Concept](dacmicu/concept.md) — Umbrella primitive (Ralph + FABRIC + TODO + evolve, plus base + subagent infra); FABRIC-not-prereq correction. *Updated: 2026-05-08*
-- [DACMICU Modular Architecture](dacmicu/modular-architecture.md) — [Decision] Six-package monorepo, dep DAG, Pi-package module-isolation constraint, three delivery strategies, verified primitives table. *Updated: 2026-05-08*
-- [DACMICU Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; bash + `pi --print` is anti-pattern; subprocess + RPC for true subagents. *Updated: 2026-05-08*
-- [DACMICU Implementation Plan](dacmicu/implementation-plan.md) — Build sequence against the modular architecture; 6 packages, ~1700 LOC total. *Updated: 2026-05-08*
-- [DACMICU Research 2026-05-08 — Subagent reuse, TODO base, Variant A](dacmicu/research-2026-05-08-subagent-and-todo.md) — Earlier deep cascade (Q1-Q5). Superseded for v1 plan by evening-2 simplification. *Updated: 2026-05-08 evening*
-- [DACMICU Research 2026-05-08 evening 2 — KISS simplification, idiomatic APIs, repo health](dacmicu/research-2026-05-08-evening2-simplification.md) — **Hopsken IS tintinweb (correction)**; project health snapshot; v1 ships **inline + tintinweb only** (HazAT deferred to v1.x); LLM uses tintinweb's idiomatic `Agent` tool, no DACMICU-owned subagent tool; popododo is proof-of-pattern only. Total custom code ~1,400 LOC. *Updated: 2026-05-08 evening 2*
-- [DACMICU Research 2026-05-08 evening 3 — Verification pass](dacmicu/research-2026-05-08-evening3-verification.md) — 6 corrections: Claude Code tool = `Agent` (not `Task`); tintinweb = Copilot shape (≠ `TodoWrite`); cmf = 1-commit experiment; HazAT = 4 phases; truncation lines 209/221; live star counts. **New: pi rebranded `@mariozechner/*` → `@earendil-works/*`**. *Updated: 2026-05-08 evening 3*
-- [DACMICU Research 2026-05-08 evening 4 — Comprehensive audit](dacmicu/research-2026-05-08-evening4-comprehensive-audit.md) — **Full verification of ALL 46 assumptions** across 8 categories. 41 confirmed, 4 false, 1 unverified. **Critical false assumptions**: tmustier has NO pause/resume; davebcn87 has NO setWidget factory. 8 runtime tests before v1. *Updated: 2026-05-08 evening 4*
-- [DACMICU Research 2026-05-08 evening 5 — Deep plan review](dacmicu/research-2026-05-08-evening5-deep-plan-review.md) — **Applied evening 4's corrections to plan docs** (which evening 4 documented but didn't apply). 7 corrections finally landed in `implementation-plan.md` and `modular-architecture.md`. Verified additional assumptions: `subagent/index.ts` is 987 LOC not 700; pi-auto-continue verified; HazAT 4-enum + 2-derived-label = 5-widget-label reconciliation; tintinweb `PROTOCOL_VERSION = 2`. Internal-consistency check across all DACMICU plan docs passed. 11 runtime tests queued (T1-T11). *Updated: 2026-05-08 evening 5*
-- [DACMICU Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — [Synthesis] Load-bearing properties of opencode PR #20074 mapped against the local stack; uniformity recovered via shared library; mid-step recursive judgment closed by fabric. *Updated: 2026-05-08*
+
+**Start here**: [DACMICU Concept](dacmicu/concept.md) — what it is, two loop variants, umbrella framing. Then [Implementation Plan](dacmicu/implementation-plan.md) for build sequence.
+
+### Canonical docs
+- [Concept](dacmicu/concept.md) — Umbrella primitive: Ralph + FABRIC + TODO + evolve, loop variants, subagent reuse decision. *Updated: 2026-05-10*
+- [Implementation Plan](dacmicu/implementation-plan.md) — Build sequence: 5 packages, dependency order, reference implementations, open issues. *Updated: 2026-05-10*
+- [Modular Architecture](dacmicu/modular-architecture.md) — Package layout, dep DAG, module-isolation constraint, delivery strategies, verified primitives. *Updated: 2026-05-10*
+- [Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; why bash + `pi --print` is anti-pattern; subprocess + RPC for subagents. *Updated: 2026-05-10*
+- [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-08*
+
+### Archive — research history
+Full decision trail, verification passes, corrections, scale-down explorations:
+- [Latest audit (2026-05-10)](dacmicu/archive/research-2026-05-10-comprehensive-verification-audit.md) — 70 claims checked, 17 false. pi-evolve provenance correction.
+- [archive/](dacmicu/archive/) — All sessions (evening 2–6) and prior audits.
 
 ## Concepts
 - [Deterministic Agent Control Mechanisms](concepts/deterministic-agent-control-mechanisms.md) — Taxonomy of 20 mechanisms with contender matrix (Pi, opencode, Claude Code, Aider). *Updated: 2026-05-07*
@@ -69,8 +73,8 @@ Catalog of compiled pages for the pi-mono project.
 - [LLM Wiki](skills/llm-wiki.md) — LLM Wiki skill notes. *Updated: 2026-04-29*
 
 ## Implementations
-- [pi-evolve Extension](implementations/pi-evolve-extension.md) — Canonical in-tree reference for the in-session DACMICU driver pattern (510 LOC). To be repackaged as `@pi-dacmicu/evolve`. *Updated: 2026-05-08*
-- [pi-callback Extension](implementations/pi-callback-extension.md) — Design for `@pi-dacmicu/fabric`: lightweight bash callback via Unix socket (~200 LOC). Closes the mid-step recursive judgment gap; serves shell composition. Independent of the loop primitive. *Updated: 2026-05-08*
+- [pi-evolve Extension](implementations/pi-evolve-extension.md) — Design sketch for `@pi-dacmicu/evolve` (510 LOC draft, untracked, unverified). *Updated: 2026-05-10*
+- [pi-callback Extension](implementations/pi-callback-extension.md) — Design for `@pi-dacmicu/fabric`: lightweight bash callback via Unix socket (~200 LOC). Closes the mid-step recursive judgment gap. *Updated: 2026-05-08*
 
 ## Raw Sources
 - [Session Registry](raw-sources/index.md)

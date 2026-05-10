@@ -212,5 +212,5 @@ Confirmed both layers have an idiomatic shape LLMs already know:
 - [research-2026-05-08-subagent-and-todo](research-2026-05-08-subagent-and-todo.md) — earlier deep cascade (Q1-Q5)
 - [ecosystem/subagents](../ecosystem/subagents.md) — full 12+-extension survey
 - [ecosystem/todo-visualizations](../ecosystem/todo-visualizations.md) — TODO ecosystem
-- [concept](concept.md) — top-level DACMICU framing
-- [modular-architecture](modular-architecture.md) — package layout
+- [concept](../concept.md) — top-level DACMICU framing
+- [modular-architecture](../modular-architecture.md) — package layout

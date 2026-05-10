@@ -211,6 +211,6 @@ These should land in implementation-plan.md as part of the next pass, not in thi
 - [research-2026-05-08-evening2-simplification](research-2026-05-08-evening2-simplification.md) — KISS simplification, Hopsken=tintinweb correction
 - [research-2026-05-08-evening3-verification](research-2026-05-08-evening3-verification.md) — claim-by-claim verification (overlap with evening 4)
 - [research-2026-05-08-evening4-comprehensive-audit](research-2026-05-08-evening4-comprehensive-audit.md) — 46 assumptions audited, 4 false found
-- [concept](concept.md) — top-level DACMICU framing
-- [implementation-plan](implementation-plan.md) — build sequencing (now updated)
-- [modular-architecture](modular-architecture.md) — package layout (now updated)
+- [concept](../concept.md) — top-level DACMICU framing
+- [implementation-plan](../implementation-plan.md) — build sequencing (now updated)
+- [modular-architecture](../modular-architecture.md) — package layout (now updated)

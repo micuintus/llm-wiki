@@ -44,7 +44,7 @@ Pi has implementations of all three. None match Claude Code's `TodoWrite` widget
 | Extension | LOC | Pattern | Tool shape | Trained-on origin | State | UI | Notes |
 |-----------|-----|---------|------------|-------------------|-------|----|-------|
 | `pi-mono/examples/extensions/todo.ts` | 297 | Tool-only (reference) | Custom (`add`/`update`/`remove`/`set-state`) | None — bespoke | session `details` | `/todos` slash | Branch-safe pattern; canonical starting point |
-| **`tintinweb/pi-manage-todo-list`** | **506** | **Tool + widget + slash** | **`manage_todo_list` `{operation: read\|write, todoList}`** | **GitHub Copilot Chat — verbatim** | session `details` (branch-safe) | `setWidget` factory + theme + strikethrough + `/todos` | **Recommended DACMICU TODO base.** See [research 2026-05-08 § Q2](../dacmicu/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension). |
+| **`tintinweb/pi-manage-todo-list`** | **506** | **Tool + widget + slash** | **`manage_todo_list` `{operation: read\|write, todoList}`** | **GitHub Copilot Chat — verbatim** | session `details` (branch-safe) | `setWidget` factory + theme + strikethrough + `/todos` | **Recommended DACMICU TODO base.** See [research 2026-05-08 § Q2](../dacmicu/archive/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension). |
 | `tintinweb/pi-tasks` | 2,061 | 7 tools + DAG + file-backed | `TaskCreate`/`TaskList`/`TaskGet`/`TaskUpdate`/`TaskOutput`/`TaskStop`/`TaskExecute` | Claude Code — verbatim | file-backed (cross-session) | Animated star spinner, deps shown | Author markets as successor; rejected for DACMICU (DAG fights deterministic outer loop) |
 | `Soleone/pi-tasks` | 3,566 | Pluggable backends | Variable per backend | Variable | beads / `todo.md` / … | Yes | Heavyweight |
 | `mitsuhiko/agent-stuff/todos.ts` | 2,082 | Tool + file-per-todo | Custom (markdown files) | None | `.pi/todos/*.md` | Status indicator | File-on-disk, less branch-safe |
@@ -138,7 +138,7 @@ LLMs are heavily trained on two TODO-tool shapes:
 
 If an extension matches one of these shapes, the LLM uses it correctly with **zero system-prompt fine-tuning**. Inventing a custom tool shape (the in-tree reference, mitsuhiko, forjd, patriceckhart) burns prompt tokens teaching the LLM your schema and accepts a quality gap until the model has seen enough of your examples in-session.
 
-**For DACMICU we want the smaller idiomatic shape (`manage_todo_list`) plus our deterministic outer loop layered on top, not the larger one (`pi-tasks`) whose built-in DAG and file-backed sharing fight the loop driver.** See [research 2026-05-08 § Q2](../dacmicu/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension) for the full reasoning.
+**For DACMICU we want the smaller idiomatic shape (`manage_todo_list`) plus our deterministic outer loop layered on top, not the larger one (`pi-tasks`) whose built-in DAG and file-backed sharing fight the loop driver.** See [research 2026-05-08 § Q2](../dacmicu/archive/research-2026-05-08-subagent-and-todo.md#q2--should-dacmicus-todo-base-wrap-an-existing-idiomatic-todo-extension) for the full reasoning.
 
 ## Existing deterministic outer-loop precedent: popododo's workflow-extension (proof-of-pattern, not a dependency)
 

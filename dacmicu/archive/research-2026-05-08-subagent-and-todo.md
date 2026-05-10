@@ -388,10 +388,10 @@ driver.start({
 
 ### Cross-references
 
-- [concept § Two loop variants](concept.md#two-loop-variants--the-load-bearing-distinction) — the original framing.
-- [implementation-plan](implementation-plan.md) — build sequence.
+- [concept § Two loop variants](../concept.md#two-loop-variants--the-load-bearing-distinction) — the original framing.
+- [implementation-plan](../implementation-plan.md) — build sequence.
 - [ecosystem/loop-extensions](../ecosystem/loop-extensions.md) — `mitsuhiko/agent-stuff/loop.ts` (450 LOC) is the closest production reference for this exact skeleton; `kostyay/agent-stuff/pi-extensions/loop.ts` validates the same primitives.
-- [pi-port](pi-port.md) — why this architecture was chosen for the Pi port.
+- [pi-port](../pi-port.md) — why this architecture was chosen for the Pi port.
 
 ---
 

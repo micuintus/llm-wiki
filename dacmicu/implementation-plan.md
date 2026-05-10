@@ -29,7 +29,7 @@ see_also:
 
 ## Build sequence
 
-**Updated 2026-05-08 evening 5**: `@pi-dacmicu/subagent` is dropped (per evening 2 simplification — see [research-2026-05-08-evening2](research-2026-05-08-evening2-simplification.md)). Now five packages plus a meta-package, build in dependency order.
+**Updated 2026-05-08**: `@pi-dacmicu/subagent` is dropped (reuse tintinweb instead). Now five packages plus a meta-package, build in dependency order.
 
 | Step | Package | Depends on | Done when |
 |---|---|---|---|
@@ -140,3 +140,12 @@ This matrix is normative: only `base` writes to `pi.sendMessage(triggerTurn:true
 - [../architecture/steering-vs-followup](../architecture/steering-vs-followup.md) — `triggerTurn:true` + `deliverAs:"followUp"` semantics
 - [../ecosystem/loop-extensions](../ecosystem/loop-extensions.md) — Ralph/until-done extensions to lift from
 - [../ecosystem/todo-visualizations](../ecosystem/todo-visualizations.md) — TODO extension survey
+
+---
+
+## History & audit trail
+
+For the full research history (decisions, verification passes, corrections, scale-down explorations):
+
+- [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked.
+- [archive/](archive/) — All research sessions.

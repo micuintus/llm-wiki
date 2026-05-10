@@ -24,6 +24,7 @@ see_also:
   - "../ecosystem/claude-code-loop.md"
   - "../architecture/loop-internals.md"
   - "../comparisons/loop-architectures.md"
+  - "archive/research-2026-05-10-comprehensive-verification-audit.md"
 ---
 
 # DACMICU — concept
@@ -45,7 +46,7 @@ Both variants share the same outer loop driver (`@pi-dacmicu/base`'s `attachLoop
 
 ### Variant A in five primitives
 
-The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics and a drop-in skeleton in [research 2026-05-08 § Q3](research-2026-05-08-subagent-and-todo.md#q3--how-does-the-in-session-lightweight-dacmicu-variant-variant-a-work).
+The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics: [pi-port](pi-port.md).
 
 1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop".
 2. **Termination predicate** — any of: `signal_loop_success` called, iteration cap hit, task predicate false, turn aborted, **`ctx.hasPendingMessages()` true** (yield to user mid-turn).
@@ -64,7 +65,7 @@ DACMICU is the **umbrella primitive** unifying four downstream concerns, plus tw
 3. **TODO system base** (`@pi-dacmicu/todo`) — structured TODO list as the loop's natural state machine. Variant A consumer. Hard-depends on `@pi-dacmicu/base`.
 4. **`pi evolve` foundation** (`@pi-dacmicu/evolve`) — MATS-style code-evolution loop. Variant B consumer (each candidate evaluated in isolation). **No validated upstream prototype exists.** A 510-LOC draft was written during DACMICU planning (`examples/extensions/pi-evolve.ts`, untracked at repo root, unverified) — see [verification audit](../research-2026-05-10-comprehensive-verification-audit.md) § Category 2 for the full provenance correction. The npm package `pi-evolve@0.1.0` is a 143-LOC brainstorming tool by Dunya Kirkali — unrelated to MATS evolution. Build from scratch or adapt patterns from `mitsuhiko/agent-stuff/extensions/loop.ts`.
 5. **Loop primitive** (`@pi-dacmicu/base`) — `agent_end`-driven scheduler with compaction preservation, abort detection, and breakout tool. Substrate-agnostic (Variant A or B). Exports the runtime as a library for the four consumers above.
-6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08, refined 2026-05-08 evening 2, verified 2026-05-08 evening 3.** Standing on the existing Pi subagent ecosystem. **v1 simplification: depend only on `tintinweb/pi-subagents`** (which exposes Claude Code-idiomatic `Agent`/`get_subagent_result`/`steer_subagent` tools — `Agent` is the canonical name; `Task` is a doc alias. LLM training-known shapes, free prompt tokens). No multi-mode `delegate()` API; the LLM uses tintinweb's `Agent` tool directly. Variant A (inline) is default; Variant B (subagent) opt-in via tintinweb's tools. `HazAT/pi-interactive-subagents` integration deferred to v1.x. See [research-2026-05-08-evening2](research-2026-05-08-evening2-simplification.md) and [research-2026-05-08-evening3-verification](research-2026-05-08-evening3-verification.md).
+6. ~~**Subagents** (`@pi-dacmicu/subagent`)~~ — **dropped 2026-05-08.** Standing on the existing Pi subagent ecosystem. **v1 simplification: depend only on `tintinweb/pi-subagents`** (which exposes Claude Code-idiomatic `Agent`/`get_subagent_result`/`steer_subagent` tools — `Agent` is the canonical name; `Task` is a doc alias. LLM training-known shapes, free prompt tokens). No multi-mode `delegate()` API; the LLM uses tintinweb's `Agent` tool directly. Variant A (inline) is default; Variant B (subagent) opt-in via tintinweb's tools. `HazAT/pi-interactive-subagents` integration deferred to v1.x.
 
 > **Action item from evening-3 verification**: pi was rebranded `@mariozechner/*` → `@earendil-works/*` (commits `551385e4`, `3e5ad67e`). tintinweb still pins legacy scope. `@pi-dacmicu/*` peer-deps must use **`@earendil-works/pi-coding-agent`**. Both scopes work today (legacy alias still publishes); plan for tintinweb release that updates peer-deps.
 
@@ -82,7 +83,7 @@ The deep ecosystem cascade ([ecosystem/subagents](../ecosystem/subagents.md)) fo
 |---|---|---|
 | In-process subagent via `createAgentSession` | `src/agent-runner.ts` (439 LOC) | ~400 LOC |
 | Subprocess subagent via `pi --mode json` (optional) | not implemented; only in-process | n/a (we'd add) |
-| ConversationViewer modal (live `session.subscribe` updates — read-only, 500-char-truncated, single-agent, modal-blocks-parent; **NOT a Tab-switch equivalent**, see [research § Q4](research-2026-05-08-subagent-and-todo.md#q4--is-conversationviewer-an-opencode-tab-switch-equivalent-no)) | `src/ui/conversation-viewer.ts` (243 LOC) | ~250 LOC |
+| ConversationViewer modal (live `session.subscribe` updates — read-only, 500-char-truncated, single-agent, modal-blocks-parent; **NOT a Tab-switch equivalent**) | `src/ui/conversation-viewer.ts` (243 LOC) | ~250 LOC |
 | Always-visible agent-tree widget (Braille spinners, live tool activity, token counts) | `src/ui/agent-widget.ts` (488 LOC) | ~500 LOC |
 | Cross-extension RPC (`pi.events.on/emit` with scoped reply channels, `PROTOCOL_VERSION`, success/error envelope) | `src/cross-extension-rpc.ts` (95 LOC) | ~100 LOC |
 | Custom agent loading from `.pi/agents/*.md` (project + global) | `src/custom-agents.ts` (137 LOC) | ~150 LOC |
@@ -155,7 +156,6 @@ FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/
 - [modular-architecture](modular-architecture.md) — six-package monorepo, dep DAG, module-isolation constraint, delivery strategies
 - [pi-port](pi-port.md) — porting DACMICU to Pi: `triggerTurn`, `agent_end`, extension hooks; in-session driver as THE port
 - [implementation-plan](implementation-plan.md) — build sequence against the modular architecture
-- [research-2026-05-08-subagent-and-todo](research-2026-05-08-subagent-and-todo.md) — reuse decisions for subagent provider + idiomatic TODO base + Variant A skeleton (~150 LOC)
 - [spirit-vs-opencode](spirit-vs-opencode.md) — synthesis: separating DACMICU's load-bearing ideas from the bash-callback substrate; spirit gaps and wins
 - [../implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — closes the mid-step recursive judgment gap
 - [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — current MATS-style consumer of the umbrella
@@ -170,3 +170,18 @@ FABRIC composition (M20 in [deterministic-agent-control-mechanisms](../concepts/
 - [History Mechanisms](../../../../MetaHarness/llm-wiki/concepts/history-mechanisms.md) — full-history vs compressed summaries
 - [Selection Policies](../../../../MetaHarness/llm-wiki/concepts/selection-policies.md) — "no policy" design choice
 - [Objective Hacking](../../../../MetaHarness/llm-wiki/concepts/objective-hacking.md) — why correctness gating is load-bearing
+
+---
+
+## History & audit trail
+
+This page is a **living document**. For the full research history (decision process, verification passes, corrections, scale-down explorations):
+
+- [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked, 17 false, 10 need update. Includes pi-evolve provenance correction.
+- [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
+
+**Significant revisions**:
+- 2026-05-10: Corrected pi-evolve provenance (local draft, not upstream reference). Removed inline research references.
+- 2026-05-08: Dropped `@pi-dacmicu/subagent` (reuse tintinweb instead). Added npm rebrand note.
+- 2026-05-08: Refined Variant A vs Variant B framing (both first-class, not just Variant A).
+- 2026-05-08: FABRIC-not-prereq correction.

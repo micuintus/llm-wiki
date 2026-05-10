@@ -200,7 +200,7 @@ The child mode (`pi --print` vs `pi --mode json` vs `pi --mode rpc`) does **not*
 - **DACMICU does not ship a subagent extension.** `@pi-dacmicu/ralph` and `@pi-dacmicu/evolve` are Variant B consumers that depend at runtime on `Hopsken/pi-subagents` (or `tintinweb/pi-subagents` superset) via `pi.events`-based RPC.
 - **Why**: Hopsken's stack is ~10K LOC of production-validated code (in-process `createAgentSession`, ConversationViewer modal, agent-tree widget, cross-extension RPC, custom-agent loading, themed completion notifications, worktree isolation). Reproducing it would be a multi-month side quest with no architectural payoff.
 - **Coupling shape**: `subagent-client/rpc-client.ts` (~80 LOC) wraps the `subagents:rpc:spawn` / `subagents:rpc:stop` event-bus contract. Consumers emit and await scoped reply channels.
-- **Visibility & navigability** are inherited from Hopsken — ConversationViewer (`src/ui/conversation-viewer.ts`, 243 LOC) is the closest current analog to opencode's Tab-switch but is **not equivalent**: read-only modal, single-agent, 500-char tool-result truncation, modal blocks parent view. Sufficient for casual oversight; insufficient for evolve-grade candidate comparison — see [research § Q4](research-2026-05-08-subagent-and-todo.md#q4--is-conversationviewer-an-opencode-tab-switch-equivalent-no). Agent-tree widget (`src/ui/agent-widget.ts`, 488 LOC) provides always-visible status.
+- **Visibility & navigability** are inherited from Hopsken — ConversationViewer (`src/ui/conversation-viewer.ts`, 243 LOC) is the closest current analog to opencode's Tab-switch but is **not equivalent**: read-only modal, single-agent, 500-char tool-result truncation, modal blocks parent view. Sufficient for casual oversight; insufficient for evolve-grade candidate comparison. Agent-tree widget (`src/ui/agent-widget.ts`, 488 LOC) provides always-visible status.
 - **Graceful degradation**: if Hopsken is not installed, ralph silently falls back to Variant A (in-session). Evolve refuses to start with a clear error message pointing at install instructions.
 - **Fallback** if Hopsken integration proves untenable: a thin internal wrapper over `createAgentSession` (~400 LOC), no UI layer. Documented as last-resort only.
 
@@ -241,10 +241,19 @@ Neither static `setWidget(key, [...])` nor a single rendering layer matches what
 ## Cross-references
 
 - [concept](concept.md) — umbrella framing (preserved)
-- [implementation-plan](implementation-plan.md) — superseded design; kept for history
+- [implementation-plan](implementation-plan.md) — build sequence against this architecture
 - [pi-port](pi-port.md) — port architecture
 - [spirit-vs-opencode](spirit-vs-opencode.md) — divergence analysis
 - [../implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — reference impl for `@pi-dacmicu/evolve`
 - [../implementations/pi-callback-extension](../implementations/pi-callback-extension.md) — design for `@pi-dacmicu/fabric`
 - [../architecture/subprocess-rpc-rendering](../architecture/subprocess-rpc-rendering.md) — the visibility-preserving subagent substrate
 - [../architecture/steering-vs-followup](../architecture/steering-vs-followup.md) — why `triggerTurn:true` + `deliverAs:"followUp"` is the right loop-driver primitive
+
+---
+
+## History & audit trail
+
+For the full research history (decisions, verification passes, corrections, scale-down explorations):
+
+- [archive/research-2026-05-10-comprehensive-verification-audit.md](archive/research-2026-05-10-comprehensive-verification-audit.md) — Latest audit: 70 claims checked.
+- [archive/](archive/) — All research sessions.

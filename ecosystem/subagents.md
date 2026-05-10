@@ -28,7 +28,7 @@ tags: [subagent, extension, dacmicu, in-process, navigability, viewer, multiplex
 see_also:
   - "../architecture/subprocess-rpc-rendering.md"
   - "../dacmicu/modular-architecture.md"
-  - "../dacmicu/research-2026-05-08-subagent-and-todo.md"
+  - "../dacmicu/archive/research-2026-05-08-subagent-and-todo.md"
   - "loop-extensions.md"
   - "todo-visualizations.md"
 ---
@@ -474,7 +474,7 @@ The first is a UX nicety. The second is a real defect for evolve-grade post-mort
 
 ### v1 simplification (KISS): tintinweb only, defer HazAT
 
-After the user pushed back on growing complexity (per-consumer providers, multi-mode `delegate()` API), the v1 plan reduces to **one soft-dep on `tintinweb/pi-subagents`** for both ralph and evolve. HazAT integration is deferred to v1.x driven by real evolve usage data. Rationale captured in [research-2026-05-08-evening2-simplification](../dacmicu/research-2026-05-08-evening2-simplification.md).
+After the user pushed back on growing complexity (per-consumer providers, multi-mode `delegate()` API), the v1 plan reduces to **one soft-dep on `tintinweb/pi-subagents`** for both ralph and evolve. HazAT integration is deferred to v1.x driven by real evolve usage data. Rationale captured in [research-2026-05-08-evening2-simplification](../dacmicu/archive/research-2026-05-08-evening2-simplification.md).
 
 | Consumer | v1 (KISS) | v1.x (if data justifies) |
 |---|---|---|
@@ -527,7 +527,7 @@ DACMICU consumes tintinweb's production-grade extension via its `subagents:rpc:s
 
 ## Cross-references
 
-- [research-2026-05-08-subagent-and-todo](../dacmicu/research-2026-05-08-subagent-and-todo.md) — DACMICU build-vs-reuse decisions
+- [research-2026-05-08-subagent-and-todo](../dacmicu/archive/research-2026-05-08-subagent-and-todo.md) — DACMICU build-vs-reuse decisions
 - [architecture/subprocess-rpc-rendering](../architecture/subprocess-rpc-rendering.md) — JSON event parsing → Message[] → render
 - [dacmicu/modular-architecture](../dacmicu/modular-architecture.md) — package layout, soft-dep relationships
 - [loop-extensions](loop-extensions.md) — companion survey of loop drivers
