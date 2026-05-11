@@ -116,36 +116,45 @@ page. The other file links to it.
 The usual split: `README.md` is the GitHub landing (goal-oriented,
 small, links into the wiki); `index.md` is the canonical full browse.
 
-### Inline table of contents
+### Inline table of contents on long pages
 
-Any compiled page >200 lines or with >6 `##` sections gets a
-`## Contents` block immediately after the `h1`. Link to section
-anchors using the slugified heading text:
+Pages >200 lines get a `## Contents` block immediately after the `h1`,
+linking to slugified section anchors:
 
 ```markdown
 ## Contents
 
 - [Section name](#section-name)
-- [Another section](#another-section--with-details)
 ```
 
-GitHub's slug rules are not obvious for headings with em-dashes,
-parens, or slashes. Verify TOC anchors as part of lint (see below)
-rather than guessing.
+Line count is the threshold; H2-count alone is not enough (short pages
+with many short sections scroll fine). GitHub's slug rules are not
+obvious for headings with em-dashes, parens, or slashes — verify
+anchors via lint, not by guessing.
 
-### See also completeness
+### Survey page lede
 
-Every compiled page ends with `## See also` linking to 2–4 related
-pages. Reference pages (`references/`) and `index.md` are not exempt.
-If a page type genuinely has no relations, write `## See also` with an
-explanation — the section heading itself is a consistency signal.
+Survey pages (pages comparing ≥3 entries) open with a 2–3 sentence
+"short answer" naming the top picks *before* any taxonomy or variant
+breakdown. Readers who just want a recommendation get one without
+scrolling.
 
-### Decision-support tables
+If you find yourself writing a "What this page is for" or "About this
+survey" section, that's a smell — write the answer instead. Defensive
+meta-commentary tells the reader the author was unsure; it doesn't
+help the reader decide.
 
-Survey pages (pages that compare ≥3 entries in a niche) should end
-with a **picking table**: "If you want X, use Y" with a one-line why.
-This is the payoff for reading the survey — don't make the user
-synthesize themselves. Topic pages and concept pages do not need this.
+### Decision tables on survey pages
+
+Survey pages end with a picking table: "If you want X, use Y" with a
+one-line why. Don't make the reader re-synthesize what the survey
+already concluded. Topic pages and concept pages don't need this.
+
+### `## See also` on every page
+
+2–4 related links. Reference pages and `index.md` are not exempt. If a
+page genuinely has no relations, write the section with an explanation
+— the heading itself is the consistency signal.
 
 ## Lint
 
