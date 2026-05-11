@@ -48,10 +48,9 @@ Both variants share the same outer loop driver (`@pi-dacmicu/base`'s `attachLoop
 The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics: [pi-port](pi-port.md).
 
 1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop". Note: `event.messages` contains only the **current cycle's** messages, not the full loop history. For cross-iteration state, use `ctx.sessionManager.getBranch()` or `pi.appendEntry()`.
-2. **Termination predicate** — any of: `signal_loop_success` called, task predicate false, turn aborted, **`ctx.hasPendingMessages()` true** (yield to user mid-turn). **Iteration cap** can be added as a mechanical guardrail (default: 50) but is NOT present in the canonical reference (`mitsuhiko/agent-stuff/loop.ts`). Without an added cap, **zero** termination conditions are fully mechanical — all require LLM cooperation or user action.
+2. **Termination predicate — objective state only.** The driver's `shouldContinue` is checked at every `agent_end`. It returns `false` only when **objective state** says the work is done (e.g. `todos.every(completed)`, or the list is empty). It does **not** depend on the LLM declaring success. There is intentionally no LLM-callable "stop loop" tool — the whole point of the deterministic skeleton is that the LLM cannot sneak out of it. Other termination paths: `ctx.hasPendingMessages()` is true (yield to user mid-turn) or `ctx.signal.aborted` (user pressed Ctrl-C). If the LLM wants the loop to end, it must change the objective state during one of the iterations (mark items completed, or clear the TODO list during REASSESS).
 3. **`pi.sendMessage({customType, content, display:true}, {triggerTurn:true, deliverAs:"followUp"})`** — when the agent is idle (normal at `agent_end`), this starts a new turn via `agent.prompt()`. When the agent is streaming (rare at `agent_end` but possible with concurrent events), it queues via `agent.followUp()`. The `deliverAs` parameter is ignored in the idle path; `followUp` is used only during streaming. See [steering-vs-followup](../architecture/steering-vs-followup.md) for the full path matrix.
-4. **`signal_loop_success` tool** — LLM-callable break statement.
-5. **`session_before_compact` preservation** — no "marking" mechanism exists. Extensions return a full `CompactionResult` (summary text + `firstKeptEntryId` + `details`) to override default compaction behavior. Mitsuhiko's loop appends instructions to influence the LLM-generated summary text — it does NOT preserve specific messages. DACMICU's base package provides a `CompactionResult` with `details: {dacmicuState}` and a file-backed fallback. See [TODO-state fix](#todo-state-fix) below.
+4. **`session_before_compact` preservation** — no "marking" mechanism exists. Extensions return a full `CompactionResult` (summary text + `firstKeptEntryId` + `details`) to override default compaction behavior. Mitsuhiko's loop appends instructions to influence the LLM-generated summary text — it does NOT preserve specific messages. DACMICU's base package provides a `CompactionResult` with `details: {dacmicuState}` and a file-backed fallback. See [TODO-state fix](#todo-state-fix) below.
 
 Not a subagent. Not a subprocess. Not autonomous — the LLM still drives every turn; the driver only schedules *when* the next turn fires.
 
@@ -191,7 +190,37 @@ If integration friction proves too high (e.g. Hopsken's RPC contract is too opin
 
 ## TODO base: `tintinweb/pi-manage-todo-list`
 
-**Decision:** `@pi-dacmicu/todo` peer-depends on `tintinweb/pi-manage-todo-list`. The loop driver reads its state via session-entry scanning; the LLM mutates state via the idiomatic `manage_todo_list` tool.
+**Decision:** `@pi-dacmicu/todo` **runtime-depends** on `tintinweb/pi-manage-todo-list` and lists it in its own `package.json` `pi.extensions` array. Installing `pi-dacmicu` auto-loads tintinweb. The LLM mutates state via the idiomatic `manage_todo_list` tool (registered by tintinweb); the loop driver (registered by `@pi-dacmicu/todo`) reads that state via session-entry scanning.
+
+### How the two extensions mesh
+
+```
+pi-dacmicu/package.json
+  pi.extensions:
+    1. ./node_modules/pi-manage-todo-list/src/index.ts   (tintinweb)
+    2. ./packages/base/index.ts                          (DACMICU base)
+    3. ./packages/todo/index.ts                          (DACMICU todo driver)
+```
+
+Pi loads all three extensions on startup. The LLM-visible surface is exactly one tool — tintinweb's `manage_todo_list`. There is no DACMICU-specific TODO tool, because building one would force the user to choose between idioms (tintinweb's wide-deployed shape vs our reimplementation). Instead, DACMICU is **invisible** to the LLM as a tool surface and **forceful** as a turn scheduler.
+
+| Layer | Owned by | Job |
+|---|---|---|
+| `manage_todo_list` tool | `tintinweb/pi-manage-todo-list` | LLM-facing CRUD for todo items; persists state as toolResult `details` in session entries |
+| Phase file `~/.pi/dacmicu/state/<session-id>.json` | `@pi-dacmicu/base` | Tracks `{phase: work | reassess}` per loop driver; durable across compaction |
+| `agent_end` driver | `@pi-dacmicu/todo` | On every assistant turn end: scans session entries for latest `manage_todo_list` toolResult, computes next phase, injects WORK or REASSESS prompt via `sendMessage({triggerTurn: true})` |
+| Exit condition | `@pi-dacmicu/todo` `shouldContinue` | Returns `false` iff `todos.every(completed)` — pure objective check, **no LLM-callable break tool** |
+
+The LLM never knows DACMICU exists. It just uses `manage_todo_list` like in any other Pi session. The only behavioral difference: after every turn, DACMICU forces it back into either WORK or REASSESS mode until the list is empty/completed. Reassessment is forced — the LLM cannot skip it, and during REASSESS it can decide "the list is garbage, clear it" by calling `manage_todo_list(write, todoList=[])`, which is the legitimate way out.
+
+### Pluggable backends — decided not to (2026-05-11)
+
+Considered two ways to support backends other than tintinweb (e.g. `edxeth/pi-tasks`):
+
+- **A. Adapter interface (`TodoSource`)** — adapter functions live inside `@pi-dacmicu/todo`; user picks one via factory option. Simple, typed, one package.
+- **B. Event-bus sync** — driver listens for `dacmicu:todo-state-changed`; a per-backend bridge extension translates that backend's tool results into the event. **Naive form fails**: tintinweb/edxeth have no reason to emit a `dacmicu:*` event — we'd need a separate bridge package we own. Bridge ends up being the same translation code as A's adapter, just in its own package.
+
+**Decision: neither for now.** One backend (tintinweb), one consumer. Premature abstraction. If a second backend ever lands, start with **A**; reach for B only if third parties want to ship bridges without coordinating with us. Coupling contract is documented in `loadTodosFromSession` so future-us knows where to extract.
 
 ### Why not `edxeth/pi-tasks` (the strongest full task system in Pi)
 
@@ -317,6 +346,9 @@ This page is a **living document**. For the full research history (decision proc
 - [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
 
 **Significant revisions**:
+- 2026-05-11: Removed `signal_loop_success` tool entirely. The LLM no longer has an escape hatch from any deterministic loop. Exit is determined by objective state only (`todos.every(completed)`, fitness target, etc.). User decision: the deterministic skeleton is the whole point — the LLM must be forced through WORK/REASSESS until the work is genuinely done, and the legitimate way to "give up" is to clear the TODO list during REASSESS.
+- 2026-05-11: Documented how `@pi-dacmicu/todo` and `tintinweb/pi-manage-todo-list` mesh: tintinweb owns the LLM tool surface, DACMICU owns turn scheduling. Both auto-load via `pi.extensions`. The LLM never sees DACMICU as a tool.
+- 2026-05-11: Auto-attached TODO loop driver on extension load. Removed `/todo-loop` command — the loop is the system identity, not an opt-in mode. No-op when list is empty/completed.
 - 2026-05-10: User confirmed v1 scope: base + todo + ralph + evolve + fabric. Evolve is a key feature (build from scratch). Fabric confirmed from opencode experience. Ralph is thin wrapper around base.
 - 2026-05-10: Added deterministic TODO loop section (check → update → work). Added TODO base decision (tintinweb/pi-manage-todo-list vs edxeth/pi-tasks).
 - 2026-05-10: Corrected pi-evolve provenance (local draft, not upstream reference). Removed inline research references.

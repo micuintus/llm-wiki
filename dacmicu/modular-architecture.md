@@ -38,17 +38,102 @@ Supersedes the single-extension decision in [implementation-plan](implementation
 
 | # | Package | LOC est. | Hard deps | Purpose |
 |---|---|---|---|---|
-| 1 | `@pi-dacmicu/base` | **~250** | none | Deterministic in-session loop primitive: `agent_end` driver, `signal_loop_success` tool, compaction preservation (CompactionResult + file fallback), abort detection, state rehydration, `appendSystemPrompt` helper, single-driver sentinel. Exports the runtime as a library for consumers. |
-| 2 | `@pi-dacmicu/todo` | ~250 | base | Deterministic TODO system. The TODO list IS the loop's state machine; the outer loop checks `unchecked > 0`, reassesses validity, syncs state, works the next item. Tool + widget + `/todo-loop` command. |
+| 1 | `@pi-dacmicu/base` | **~200** | none | Deterministic in-session loop primitive: `agent_end` driver, compaction preservation (CompactionResult + file fallback), abort detection, state rehydration, `appendSystemPrompt` helper, single-driver sentinel. **No LLM-callable break tool** — exit is determined by the driver's `shouldContinue` against objective state. Exports the runtime as a library for consumers. |
+| 2 | `@pi-dacmicu/todo` | ~150 | base; runtime-loads `pi-manage-todo-list` via `pi.extensions` | Deterministic TODO system. **Auto-attaches** the loop driver on extension load (no manual activation). The TODO list IS the loop's state machine; the outer loop checks `todos.some(!completed)`, reassesses validity, then works the next item. tintinweb owns the LLM-facing `manage_todo_list` tool; DACMICU owns turn scheduling. |
 | 3 | ~~`@pi-dacmicu/subagent`~~ | — | — | **Dropped 2026-05-08.** Replaced by `pi.events`-RPC dependency on `Hopsken/pi-subagents` (or `tintinweb/pi-subagents`). Their `createAgentSession` + ConversationViewer + agent-tree widget + cross-extension RPC is ~10K LOC of production-validated code we'd otherwise reinvent. See [concept § Subagent build-vs-reuse decision](concept.md#subagent-build-vs-reuse-decision-2026-05-08). |
 | 4 | `@pi-dacmicu/fabric` | ~250 | none | Bash callback infrastructure. Unix socket + `pi-callback` CLI on PATH + bash env injection via `tool_call` interceptor. Closes the mid-step recursive judgment gap; serves shell-pipeline composition. |
 | 5 | `@pi-dacmicu/ralph` | ~200 | base; **runtime-soft `Hopsken/pi-subagents`** | Ralph-loop UX: `/ralph "<goal>"` command. Variant A (in-session) by default. Variant B (subagent-per-iteration) when Hopsken's RPC is available — emits `subagents:rpc:spawn` per iteration for fresh-context-per-check parity with opencode `oc check`. Graceful degrade if subagent provider absent. |
 | 6 | `@pi-dacmicu/evolve` | **~1,200** | base; **runtime-soft `Hopsken/pi-subagents`** | MATS-style code-evolution loop. **Target: Variant B** (each candidate in isolation via subagent). Existing 510-LOC draft is Variant A (in-session git ops, no subagent code); requires significant rewrite for spawn coordination, result extraction, timeout handling. Variants on git branches `evolve/vN/<slug>`; `selection.md` ledger; `init/run/log_experiment` tools; `signal_evolve_success` breakout. **No validated upstream prototype exists.**
 
-Dependency DAG:
+## How `base`, `todo`, and `tintinweb/pi-manage-todo-list` interact
+
+The TODO system is three independently-loaded Pi extensions with one-way couplings:
 
 ```
-                   base ───── todo                        (Variant A consumer)
+                ┌────────────────────────────────────────────┐
+                │  LLM                                       │
+                │  sees only:  manage_todo_list(op, list)    │
+                └────────────────┬───────────────────────────┘
+                                 │ tool call
+                                 ▼
+┌──────────────────────────────────────────────────────────────┐
+│  tintinweb/pi-manage-todo-list                               │
+│  - Owns the LLM tool surface                                 │
+│  - Validates input, writes a toolResult into the session     │
+│    with details: { todos: [...] }                            │
+│  - Knows NOTHING about DACMICU                               │
+└──────────────────────────────────────────────────────────────┘
+                                 │ toolResult appended to session.branch
+                                 ▼
+┌──────────────────────────────────────────────────────────────┐
+│  @pi-dacmicu/todo  (the loop *driver*)                       │
+│  - Reads tintinweb's toolResult via loadTodosFromSession     │
+│  - On every agent_end:                                       │
+│      shouldContinue → todos.some(!completed)                 │
+│      buildIterationPrompt → WORK or REASSESS prompt          │
+│      flips phase, calls sendMessage({triggerTurn:true})      │
+│  - Depends on base for attachLoopDriver / read/writeState    │
+└──────────────────────────────────────────────────────────────┘
+                                 │ uses
+                                 ▼
+┌──────────────────────────────────────────────────────────────┐
+│  @pi-dacmicu/base  (the loop *primitive*)                    │
+│  - attachLoopDriver(pi, driver): registers agent_end +       │
+│    before_agent_start + session_before_compact handlers      │
+│  - readState/writeState/deleteState: file-backed kv at       │
+│    .pi/dacmicu/state/<session-id>.json — durable across      │
+│    compaction, isolated per /fork                            │
+│  - appendSystemPrompt helper                                 │
+│  - Knows nothing about TODOs; substrate for ANY driver       │
+│    (todo now; future ralph, evolve)                          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Three responsibilities, cleanly separated:**
+
+| Concern | Owner | Why there |
+|---|---|---|
+| What the LLM can do | tintinweb | Idiomatic Pi TODO tool; LLMs already know its shape (replicates Copilot's `manage_todo_list`) |
+| When the LLM gets to do it (turn scheduling) | `@pi-dacmicu/todo` | The deterministic skeleton (WORK→REASSESS) is TODO-specific logic |
+| How a driver attaches to Pi's lifecycle, persists state, survives compaction | `@pi-dacmicu/base` | Generic primitive — TODO is just the first consumer; ralph and evolve will reuse it |
+
+**One-turn data flow:**
+
+```
+LLM finishes a turn → agent_end fires
+    │
+    ▼
+base's agent_end handler runs
+    │ 1. calls todo.shouldContinue(ctx, state)
+    │      └─ todo reads phase from base.readState("todo")
+    │         and todos from session entries (tintinweb's last toolResult)
+    │         → returns true (incomplete items exist)
+    │
+    │ 2. calls todo.buildIterationPrompt(ctx, state)
+    │      └─ todo flips phase via base.writeState
+    │         returns {customType: "todo-work" | "todo-reassess", content: ...}
+    │
+    │ 3. base calls pi.sendMessage(..., {triggerTurn:true})
+    ▼
+Pi schedules next turn → LLM gets prompt → uses manage_todo_list
+    │                                                  ↑
+    └── back to agent_end ─────────────────────────────┘
+```
+
+**Coupling summary:**
+
+| Pair | Direction | Strength |
+|---|---|---|
+| `base` ↔ `todo` | `todo` imports `base`; `base` has no idea `todo` exists | Strong, typed, one-way |
+| `base` ↔ tintinweb | none | No relationship |
+| `todo` ↔ tintinweb | `todo` reads `toolName === "manage_todo_list"` and `details.todos` from session entries; tintinweb has no idea `todo` exists | **Soft, fragile.** Pinned by version range in `package.json` and documented as a CONTRACT comment in `loadTodosFromSession`. This is the one place that would change if a `TodoSource` adapter were ever added — see [concept.md § Pluggable backends](concept.md#pluggable-backends--decided-not-to-2026-05-11). |
+
+The LLM never knows DACMICU exists. It just uses `manage_todo_list` like any other Pi session. The behavioral difference: after every turn, DACMICU forces it back into WORK or REASSESS mode until `todos.every(completed)`. Reassessment is **forced** — the LLM cannot skip it, and during REASSESS it can decide "the list is garbage, clear it" by calling `manage_todo_list(write, todoList=[])`. That is the only legitimate exit besides completing every item. There is no LLM-callable break tool. See also [ecosystem/todo-tool-apis](../ecosystem/todo-tool-apis.md) for how tintinweb's tool shape compares to Claude Code's `TodoWrite` and opencode's `todowrite`/`todoread`.
+
+## Dependency DAG
+
+```
+                   base ───── todo ───► [tintinweb/pi-manage-todo-list]   (runtime; auto-loaded via pi.extensions)
                     │
                     └──── ralph ······► [Hopsken/pi-subagents]   (Variant A or B; soft dep)
                     │
