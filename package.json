@@ -1,6 +1,6 @@
 {
   "name": "@micuintus/llm-wiki",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "As minimal as Pi. Karpathy's LLM Wiki pattern as a minimal, agent-agnostic skill.",
   "keywords": [
     "pi-package",

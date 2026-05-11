@@ -17,7 +17,7 @@ pi install npm:@micuintus/llm-wiki
 
 **Pi (GitHub):**
 ```bash
-pi install github:micuintus/llm-wiki
+pi install git:github.com/micuintus/llm-wiki
 ```
 
 **Everyone else:**
