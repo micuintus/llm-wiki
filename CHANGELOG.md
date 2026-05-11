@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.3] — 2026-05-09
+
+### Fixed
+- **README install command** — `pi install github:micuintus/llm-wiki` doesn't work; pi has no `github:` source handler (only `npm:`, `git:`, and protocol URLs). Replaced with `pi install git:github.com/micuintus/llm-wiki`.
+- **`references/pi-session-recipe.md`** — verification preamble now references `@earendil-works/pi-coding-agent` (the package was renamed from `@mariozechner/pi-coding-agent`; session layout is unchanged).
+
 ## [1.4.2] — 2026-05-07
 
 ### Fixed
