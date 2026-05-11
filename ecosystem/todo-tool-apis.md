@@ -10,16 +10,27 @@ Comparison of the LLM-facing TODO tool surface across Claude Code, GitHub Copilo
 |---|---|---|---|---|
 | **Claude Code** | `TodoWrite` only (read is implicit — list is rendered in UI) | `content` (imperative), `activeForm` (present continuous), `status` | `pending` / `in_progress` / `completed` | No `id`. The pair of `content` + `activeForm` is unique to Claude Code — drives the live status line ("Running tests…"). |
 | **GitHub Copilot** | `manage_todo_list` (single tool, `operation: "read" | "write"`) | `id` (sequential int), `title` (3-7 words), `description`, `status` | `not-started` / `in-progress` / `completed` | Operation discriminator inside one tool. `description` field was briefly missing from the schema in late 2025 (microsoft/vscode#291253) but restored. |
-| **opencode** | `todowrite` + `todoread` (two separate tools) | `id` (string), `content`, `status` (+ optional `priority` in some forks) | `pending` / `in_progress` / `completed` | Schema lives in `packages/opencode/src/session/todo.ts`; tool wrappers in `packages/opencode/src/tool/todo.ts`. Permission-gated (`permission.todowrite`). Disabled for subagents by default. |
+| **opencode (stable, ≤ v1.14.48)** | `todowrite` + `todoread` (two tools) | `id` (string), `content`, `status` | `pending` / `in_progress` / `completed` | Documented in opencode.ai/docs. Permission-gated. Subagent-disabled by default. |
+| **opencode (dev branch, `origin/dev` as of 2026-05-11)** | `todowrite` only — **`todoread` removed** | `content`, `status`, `priority` — **no `id`** (positional) | `pending` / `in_progress` / `completed` / **`cancelled`** | Migrating zod → effect `Schema`. Storage moved to SQLite (`TodoTable`, Drizzle ORM); per-session, ordered by `position`. Every write publishes `todo.updated` event on the Bus — UI re-renders via push, so a read tool is redundant. Priority field is new. `cancelled` status is new. |
 | **tintinweb/pi-manage-todo-list** | `manage_todo_list` (single tool, `operation: "read" | "write"`) | `id` (int), `title`, `description`, `status` | `not-started` / `in-progress` / `completed` | **Replicates Copilot's shape verbatim** (file header: "replicates GitHub Copilot's manage_todo_list"). Tool description text is Copilot's, near-verbatim. |
 
 ## Common ground
 
-All four systems share:
+All systems share:
 
-- **Full-list replacement on write.** No partial updates, no individual `addItem` / `markDone` / `delete`. The LLM passes the entire array on every mutation. This is the load-bearing design choice — it forces the LLM to re-render its full plan every time, which is what makes the list legible as a working memory.
-- **Three-state finite status enum.** Always some shape of `not-started → in-progress → completed`. Nothing fancier (no `blocked`, no `cancelled` — Copilot/tintinweb explicitly note "no blockers" as part of completed).
-- **Session-scoped state.** Each system stores the list per-session. None of the built-ins persist across sessions by default.
+- **Full-list replacement on write.** No partial updates, no individual `addItem` / `markDone` / `delete`. The LLM passes the entire array on every mutation. Load-bearing design choice — it forces the LLM to re-render its full plan every time.
+- **Finite status enum.** All converge on `pending/not-started → in-progress → completed`. opencode dev adds a fourth value (`cancelled`); everyone else sticks to three. No `blocked`.
+- **Session-scoped state.** None of the built-ins persist across sessions by default.
+
+## opencode's recent move
+
+The `origin/dev` snapshot shows opencode making three meaningful changes vs. its stable docs:
+
+1. **`todoread` removed.** Reads happen via the Bus `todo.updated` event — every write publishes, every observer (UI, tools, subscribers) gets pushed the new list. No need for the LLM to "read" what it can just track.
+2. **`id` removed.** Items are positional — order in the array IS the order. Mirrors Claude Code's positional model.
+3. **`priority` and `cancelled` added.** Richer state; the LLM can mark items abandoned (vs. completed) and the UI/agent can sort by priority.
+
+This is convergent evolution toward Claude Code's shape (positional, no `id`, push-based reads) with opencode-specific additions (priority, cancelled). tintinweb still tracks the older Copilot shape — which is the *opposite* direction from where opencode is heading.
 
 ## Where they diverge
 
@@ -35,10 +46,19 @@ All four systems share:
 
 ### Status naming
 
-- **Claude Code & opencode**: snake_case (`pending`, `in_progress`, `completed`).
+- **Claude Code & opencode**: snake_case (`pending`, `in_progress`, `completed`, + `cancelled` on opencode dev).
 - **Copilot & tintinweb**: kebab-case (`not-started`, `in-progress`, `completed`).
 
 Trivially translatable — but an adapter targeting multiple backends must normalize.
+
+### Read mechanism
+
+- **Claude Code**: implicit — UI renders the list, no read tool exposed to LLM.
+- **Copilot / tintinweb**: explicit `operation: "read"` on the single tool.
+- **opencode stable**: separate `todoread` tool.
+- **opencode dev**: implicit — `todo.updated` Bus event pushes to all observers. Read tool dropped.
+
+Push-based (Claude Code, opencode dev) vs pull-based (Copilot, tintinweb, opencode stable). Push is cheaper on tokens — the LLM never wastes a call asking for state it already has.
 
 ## Adapter implications for DACMICU
 
@@ -54,5 +74,6 @@ None of this is hard — but it's worth noting that "TODO API" is not as standar
 
 - **Claude Code**: Anthropic's tool reference (`TodoWrite`); also documented in vtrivedy.com/posts/claudecode-tools-reference/.
 - **GitHub Copilot**: tool schema described in microsoft/vscode#291253, #269055; replicated verbatim in tintinweb's package header.
-- **opencode**: `packages/opencode/src/tool/todo.ts` and `packages/opencode/src/session/todo.ts` in sst/opencode (verified via Kilo-Org mirror at commit `c3d4309d`).
+- **opencode stable**: documented at opencode.ai/docs (cross-checked against Kilo-Org mirror at commit `c3d4309d`).
+- **opencode dev**: `sst/opencode` `origin/dev` at commit `c933504d9c` (2026-05-11), files `packages/opencode/src/tool/todo.ts` and `packages/opencode/src/session/todo.ts`. Schema migrated zod → effect `Schema`; storage in SQLite (`TodoTable` via Drizzle); Bus event `todo.updated` replaces explicit reads.
 - **tintinweb**: `node_modules/pi-manage-todo-list/src/tool.ts` (v0.3.0); first line of file comment: "replicates GitHub Copilot's manage_todo_list."
