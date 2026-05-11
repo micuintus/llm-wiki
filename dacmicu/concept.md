@@ -64,23 +64,17 @@ User asks for a complex task
 LLM creates TODO list via manage_todo_list tool
     ↓
 agent_end fires → DACMICU loop driver:
-    CHECK → Read current TODO state from file
-      ↓ unchecked > 0
-    WORK → Inject top item as followUp
+    shouldContinue: todos.some(!completed)?  → YES
+    buildIterationPrompt → inject ONE prompt:
+       "Reassess the list. Update if needed. Then work the top item."
       ↓
-LLM works that item, marks done via manage_todo_list
+LLM reviews list (maybe edits via manage_todo_list),
+picks top item, works it, marks completed
       ↓
-agent_end fires → CHECK → Read updated state
-      ↓ unchecked > 0
-    REASSESS → Inject "reassess list validity" prompt
+agent_end fires → driver checks state → repeats
       ↓
-LLM reviews list, updates via manage_todo_list (or leaves as-is)
-      ↓
-agent_end fires → CHECK → Read updated state
-      ↓ unchecked > 0
-    WORK → Inject new top item
-      ↓
-    ... (cycle: WORK → REASSESS → WORK → REASSESS ...)
+... (one turn per iteration, until every item is completed
+     or the list is cleared during reassessment)
       ↓
 All items done → loop terminates
 ```
@@ -88,19 +82,12 @@ All items done → loop terminates
 **Key design decisions:**
 
 - **Loop driver runs on `agent_end`**, not as a tool the LLM calls. The LLM works items; the loop decides when to continue.
-- **Reassessment is load-bearing.** Before working the next item, the loop injects a reassess turn: "Given what we just learned, is the TODO list still valid? Reorder? Merge? Add items?" The LLM updates the list via `manage_todo_list`. The driver then works the new top item. This adds one LLM turn per item (doubles token cost vs. no-reassess) but prevents blindly working stale TODOs.
-- **Reassessment termination is implicit.** The reassess turn is a normal assistant iteration. At its `agent_end`, the driver reads the updated TODO state (from the file) and proceeds to the work turn. No special `confirm_reassessment` tool needed. The LLM signals completion by simply not calling `manage_todo_list` (implied: "list is fine, proceed").
-- **Phase state machine:**
-  ```
-  Initial: user creates list → phase = WORK
-  WORK turn completes → agent_end → CHECK → phase = REASSESS → inject reassess prompt
-  REASSESS turn completes → agent_end → CHECK → phase = WORK → inject work prompt for top item
-  unchecked == 0 at any CHECK → stop
-  ```
-  **Phase is persisted in the state file** alongside the TODO list. On `session_start` / reload, the driver reads the phase from the file and resumes correctly. Without this, a `/reload` mid-loop would lose phase and restart in an undefined state.
-- **TODO state is stored in a session-scoped file** (`~/.pi/dacmicu/state/<session-id>.json`). The file is the durable source of truth. Session entries (tool-result `details`) are secondary — they provide LLM-visible history but are **lost on compaction**. On `session_start`, the driver reads the file first, falls back to session-entry reconstruction for forks/new sessions.
-- **File-backed storage branches with `/fork` via session IDs.** Each session (including forks) gets a unique ID; the state file is keyed by ID. This gives per-branch isolation without the fragility of session-entry scanning.
-- **Session-entry persistence** (tool-result `details`) provides LLM-visible history but is **lost on compaction**. File-backed storage is the durable source of truth. Both are used: file for the driver, entries for the LLM.
+- **One prompt per iteration — reassessment is a behavior, not a phase.** Earlier designs alternated WORK and REASSESS as separate turns with a phase-flipping state machine in the file. That was removed (commit `7ade7f8a`) — the forcing was illusory (the LLM could already return from REASSESS without modifying the list) and the token cost was double. The unified prompt instructs the LLM to reassess the list before picking the next item; the forcing is in the prompt text, where it belongs.
+- **Termination is purely objective.** `shouldContinue` returns `false` when `todos.every(completed)` or the list is empty. No `signal_loop_success` tool, no LLM-callable break. The LLM exits the loop only by changing objective state.
+- **State lives in two places:**
+  - **Session entries (LLM-visible history)** — tintinweb's `manage_todo_list` toolResult `details` contain the current list. This is what `loadTodosFromSession` scans on every iteration. Lost on compaction; restored from `compactionSummary`.
+  - **`<cwd>/.pi/dacmicu/state/<session-id>.json` (driver bookkeeping)** — base writes a marker under `driverId` when the loop is active, deletes it on exit. Today, todo writes nothing of its own — it's pure stateless reads of session entries.
+- **File-backed storage branches with `/fork` via session IDs.** Each session (including forks) gets a unique ID; the state file is keyed by ID. Per-branch isolation without the fragility of session-entry scanning.
 - **No DAG, no auto-reminders, no active-task heuristics** — those fight loop-driver ownership.
 
 See [TODO base decision](#todo-base-tintinwebpi-manage-todo-list) below for why `tintinweb/pi-manage-todo-list` is the right primitive.
@@ -207,11 +194,11 @@ Pi loads all three extensions on startup. The LLM-visible surface is exactly one
 | Layer | Owned by | Job |
 |---|---|---|
 | `manage_todo_list` tool | `tintinweb/pi-manage-todo-list` | LLM-facing CRUD for todo items; persists state as toolResult `details` in session entries |
-| Phase file `~/.pi/dacmicu/state/<session-id>.json` | `@pi-dacmicu/base` | Tracks `{phase: work | reassess}` per loop driver; durable across compaction |
-| `agent_end` driver | `@pi-dacmicu/todo` | On every assistant turn end: scans session entries for latest `manage_todo_list` toolResult, computes next phase, injects WORK or REASSESS prompt via `sendMessage({triggerTurn: true})` |
+| State file `<cwd>/.pi/dacmicu/state/<session-id>.json` | `@pi-dacmicu/base` | Per-driver activation marker; durable across compaction. Today, todo writes nothing of its own here. |
+| `agent_end` driver | `@pi-dacmicu/todo` | On every assistant turn end: scans session entries for latest `manage_todo_list` toolResult, injects a unified `todo-iterate` prompt (reassess + work next) via `sendMessage({triggerTurn: true})` |
 | Exit condition | `@pi-dacmicu/todo` `shouldContinue` | Returns `false` iff `todos.every(completed)` — pure objective check, **no LLM-callable break tool** |
 
-The LLM never knows DACMICU exists. It just uses `manage_todo_list` like in any other Pi session. The only behavioral difference: after every turn, DACMICU forces it back into either WORK or REASSESS mode until the list is empty/completed. Reassessment is forced — the LLM cannot skip it, and during REASSESS it can decide "the list is garbage, clear it" by calling `manage_todo_list(write, todoList=[])`, which is the legitimate way out.
+The LLM never knows DACMICU exists. It just uses `manage_todo_list` like in any other Pi session. The only behavioral difference: after every turn, DACMICU injects a unified "reassess + work next" prompt until the list is empty or fully completed. Reassessment is part of the prompt — the LLM is instructed to check the list every turn before picking an item. The legitimate exits are completing every item or clearing the list during reassessment. There is no LLM-callable break tool.
 
 ### Pluggable backends — decided not to (2026-05-11)
 
@@ -346,7 +333,9 @@ This page is a **living document**. For the full research history (decision proc
 - [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
 
 **Significant revisions**:
-- 2026-05-11: Removed `signal_loop_success` tool entirely. The LLM no longer has an escape hatch from any deterministic loop. Exit is determined by objective state only (`todos.every(completed)`, fitness target, etc.). User decision: the deterministic skeleton is the whole point — the LLM must be forced through WORK/REASSESS until the work is genuinely done, and the legitimate way to "give up" is to clear the TODO list during REASSESS.
+- 2026-05-11: Collapsed WORK and REASSESS into one prompt per iteration (commit `7ade7f8a`). Reassessment is a behavior in the prompt text, not a separate turn. Deleted: phase state machine, sha256 stale-detection hash, `staleReassessCount`. Half the token cost, no state writes from `todo` itself, simpler LLM contract.
+- 2026-05-11: Razor-sharp API pass (commit `2da9a4f2`). Removed `DacmicuState.data`, `appendSystemPrompt`, `systemPromptAddition` callback, `Phase` type, `dacmicu:driver` sentinel custom-entry. `LoopDriver` methods now take only `ctx`. Sentinel-based `/dacmicu_status` was misleading post-compaction; now reads state file directly.
+- 2026-05-11: Removed `signal_loop_success` tool entirely. The LLM no longer has an escape hatch from any deterministic loop. Exit is determined by objective state only (`todos.every(completed)`, fitness target, etc.). User decision: the deterministic skeleton is the whole point — the LLM must be forced through reassessment until the work is genuinely done, and the legitimate way to "give up" is to clear the TODO list during REASSESS.
 - 2026-05-11: Documented how `@pi-dacmicu/todo` and `tintinweb/pi-manage-todo-list` mesh: tintinweb owns the LLM tool surface, DACMICU owns turn scheduling. Both auto-load via `pi.extensions`. The LLM never sees DACMICU as a tool.
 - 2026-05-11: Auto-attached TODO loop driver on extension load. Removed `/todo-loop` command — the loop is the system identity, not an opt-in mode. No-op when list is empty/completed.
 - 2026-05-10: User confirmed v1 scope: base + todo + ralph + evolve + fabric. Evolve is a key feature (build from scratch). Fabric confirmed from opencode experience. Ralph is thin wrapper around base.

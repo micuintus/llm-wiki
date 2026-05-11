@@ -94,7 +94,7 @@ The TODO system is three independently-loaded Pi extensions with one-way couplin
 | Concern | Owner | Why there |
 |---|---|---|
 | What the LLM can do | tintinweb | Idiomatic Pi TODO tool; LLMs already know its shape (replicates Copilot's `manage_todo_list`) |
-| When the LLM gets to do it (turn scheduling) | `@pi-dacmicu/todo` | The deterministic skeleton (WORK→REASSESS) is TODO-specific logic |
+| When the LLM gets to do it (turn scheduling) | `@pi-dacmicu/todo` | Auto-attached loop driver — fires on every `agent_end`, injects the iteration prompt |
 | How a driver attaches to Pi's lifecycle, persists state, survives compaction | `@pi-dacmicu/base` | Generic primitive — TODO is just the first consumer; ralph and evolve will reuse it |
 
 **One-turn data flow:**
@@ -104,14 +104,15 @@ LLM finishes a turn → agent_end fires
     │
     ▼
 base's agent_end handler runs
-    │ 1. calls todo.shouldContinue(ctx, state)
-    │      └─ todo reads phase from base.readState("todo")
-    │         and todos from session entries (tintinweb's last toolResult)
-    │         → returns true (incomplete items exist)
+    │ 1. calls todo.shouldContinue(ctx)
+    │      └─ todo runs loadTodosFromSession(ctx)
+    │         scans branch for latest manage_todo_list toolResult
+    │         returns todos.some(!completed)
     │
-    │ 2. calls todo.buildIterationPrompt(ctx, state)
-    │      └─ todo flips phase via base.writeState
-    │         returns {customType: "todo-work" | "todo-reassess", content: ...}
+    │ 2. calls todo.buildIterationPrompt(ctx)
+    │      └─ todo returns {customType: "todo-iterate",
+    │                       content: "reassess + update + work next item"}
+    │         (no state writes — todo is a pure read of session entries)
     │
     │ 3. base calls pi.sendMessage(..., {triggerTurn:true})
     ▼
@@ -124,11 +125,11 @@ Pi schedules next turn → LLM gets prompt → uses manage_todo_list
 
 | Pair | Direction | Strength |
 |---|---|---|
-| `base` ↔ `todo` | `todo` imports `base`; `base` has no idea `todo` exists | Strong, typed, one-way |
+| `base` ↔ `todo` | `todo` imports `base`'s `attachLoopDriver`; `base` has no idea `todo` exists | Strong, typed, one-way |
 | `base` ↔ tintinweb | none | No relationship |
 | `todo` ↔ tintinweb | `todo` reads `toolName === "manage_todo_list"` and `details.todos` from session entries; tintinweb has no idea `todo` exists | **Soft, fragile.** Pinned by version range in `package.json` and documented as a CONTRACT comment in `loadTodosFromSession`. This is the one place that would change if a `TodoSource` adapter were ever added — see [concept.md § Pluggable backends](concept.md#pluggable-backends--decided-not-to-2026-05-11). |
 
-The LLM never knows DACMICU exists. It just uses `manage_todo_list` like any other Pi session. The behavioral difference: after every turn, DACMICU forces it back into WORK or REASSESS mode until `todos.every(completed)`. Reassessment is **forced** — the LLM cannot skip it, and during REASSESS it can decide "the list is garbage, clear it" by calling `manage_todo_list(write, todoList=[])`. That is the only legitimate exit besides completing every item. There is no LLM-callable break tool. See also [ecosystem/todo-tool-apis](../ecosystem/todo-tool-apis.md) for how tintinweb's tool shape compares to Claude Code's `TodoWrite` and opencode's `todowrite`/`todoread`.
+The LLM never knows DACMICU exists. It just uses `manage_todo_list` like any other Pi session. The behavioral difference: after every turn, DACMICU injects a unified "reassess + work next" prompt until `todos.every(completed)`. Reassessment is part of the prompt — the LLM is instructed to check the list every turn before working an item. The legitimate exits are completing every item, or clearing the list during reassessment. There is no LLM-callable break tool. See also [ecosystem/todo-tool-apis](../ecosystem/todo-tool-apis.md) for how tintinweb's tool shape compares to Claude Code's `TodoWrite` and opencode's `todowrite`/`todoread`, and [runtime-walkthrough](runtime-walkthrough.md) for the full turn-by-turn flow.
 
 ## Dependency DAG
 
