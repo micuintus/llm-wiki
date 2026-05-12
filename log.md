@@ -1,5 +1,32 @@
 # Wiki Log
 
+## [2026-05-12] session-as-SOT audit + LoopDriver simplification
+
+User pushed back on session-history scanning as a means of cross-extension state sync, calling it brittle and unidiomatic. A deep audit (primary sources: pi `session-manager.d.ts`, `session-manager.js`, `compaction.md`, `event-bus.d.ts`, and ecosystem issues #326, #2420, #1370, discussion #1546) concluded the opposite: **session-log scanning is the canonical Pi cross-extension state primitive.** Pi sessions are append-only files; `getBranch()` returns full history regardless of compaction; only `buildSessionContext()` applies the compaction filter for the LLM's view. tintinweb's own state reconstruction uses the identical scan.
+
+### Decisions taken on the audit
+
+- **`compactionSummary` removed from `LoopDriver`** — was solving a non-problem. Append-only log + `getBranch()` survives compaction natively; no extension-level intervention needed.
+- **`shouldContinue` + `buildIterationPrompt` merged into `iterate(ctx) → Prompt | null`** — eliminates the double-scan, matches opencode's `oc check`-style pattern.
+- **`onLoopStart` / `onLoopEnd` deferred** — speculative, YAGNI for todo. Evolve will add them back if it needs them.
+- **Snapshot caching dropped from `@pi-dacmicu/todo`** — was the "fix" for the compaction-pruning bug that didn't exist.
+- **Re-affirmed tintinweb dependency** — only real concern (brittleness) was a felt sense, not a real risk.
+
+### Deliverables
+
+- New: `dacmicu/archive/research-2026-05-12-session-as-sot.md` — the audit and reasoning trail.
+- New: `architecture/pi-session-architecture.md` — cross-cutting page documenting the pattern for ANY Pi extension work (not just DACMICU).
+- Updated: `dacmicu/runtime-walkthrough.md`, `dacmicu/modular-architecture.md`, `dacmicu/concept.md` to reflect the simplified `LoopDriver` shape and explicitly mark compaction as Pi-handled.
+- Updated: `index.md` to include the new architecture page and the audit reference; corrected the entry for the older 2026-05-10 deep-review that claimed TODO state was lost on compaction (now known to be wrong).
+
+### Code changes (in `/Users/michael.voigt/devel/AI/aiAgentResearch/agents/pi-dacmicu/`)
+
+`packages/base/runtime.ts` rewritten — `LoopDriver` is now a 3-line interface with one method (`iterate`). `attachLoopDriver` is ~30 LOC. State helpers remain (for evolve). Compaction is intentionally NOT handled here.
+
+`packages/todo/index.ts` rewritten — pure stateless polling of the session log; ~80 LOC, zero state-file writes, no compaction handler.
+
+All 18 tests pass; type-check clean.
+
 ## [2026-05-10 evening] comprehensive verification audit completed
 
 User requested: (1) verify wiki consistency, (2) verify ALL assumptions, (3) assess plans in depth, (4) document.

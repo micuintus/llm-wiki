@@ -48,9 +48,9 @@ Both variants share the same outer loop driver (`@pi-dacmicu/base`'s `attachLoop
 The lightweight in-session loop is implemented entirely from existing Pi extension hooks. No subagent host, no subprocess, no second model registry. ~150 LOC fits in `@pi-dacmicu/base`. Full mechanics: [pi-port](pi-port.md).
 
 1. **`agent_end` listener** — fires after every assistant turn; the natural decision point for "loop or stop". Note: `event.messages` contains only the **current cycle's** messages, not the full loop history. For cross-iteration state, use `ctx.sessionManager.getBranch()` or `pi.appendEntry()`.
-2. **Termination predicate — objective state only.** The driver's `shouldContinue` is checked at every `agent_end`. It returns `false` only when **objective state** says the work is done (e.g. `todos.every(completed)`, or the list is empty). It does **not** depend on the LLM declaring success. There is intentionally no LLM-callable "stop loop" tool — the whole point of the deterministic skeleton is that the LLM cannot sneak out of it. Other termination paths: `ctx.hasPendingMessages()` is true (yield to user mid-turn) or `ctx.signal.aborted` (user pressed Ctrl-C). If the LLM wants the loop to end, it must change the objective state during one of the iterations (mark items completed, or clear the TODO list during REASSESS).
-3. **`pi.sendMessage({customType, content, display:true}, {triggerTurn:true, deliverAs:"followUp"})`** — when the agent is idle (normal at `agent_end`), this starts a new turn via `agent.prompt()`. When the agent is streaming (rare at `agent_end` but possible with concurrent events), it queues via `agent.followUp()`. The `deliverAs` parameter is ignored in the idle path; `followUp` is used only during streaming. See [steering-vs-followup](../architecture/steering-vs-followup.md) for the full path matrix.
-4. **`session_before_compact` preservation** — no "marking" mechanism exists. Extensions return a full `CompactionResult` (summary text + `firstKeptEntryId` + `details`) to override default compaction behavior. Mitsuhiko's loop appends instructions to influence the LLM-generated summary text — it does NOT preserve specific messages. DACMICU's base package provides a `CompactionResult` with `details: {dacmicuState}` and a file-backed fallback. See [TODO-state fix](#todo-state-fix) below.
+2. **Termination predicate — objective state only.** The driver's `iterate(ctx)` runs at every `agent_end`. It returns `null` only when **objective state** says the work is done (e.g. `todos.every(completed)`, or the list is empty). It does **not** depend on the LLM declaring success. There is intentionally no LLM-callable "stop loop" tool — the whole point of the deterministic skeleton is that the LLM cannot sneak out of it. Other termination paths: `ctx.hasPendingMessages()` is true (yield to user mid-turn) or `ctx.signal.aborted` (user pressed Ctrl-C). If the LLM wants the loop to end, it must change the objective state during one of the iterations (mark items completed, or clear the TODO list during reassessment).
+3. **`pi.sendMessage({customType, content, display:false}, {triggerTurn:true, deliverAs:"followUp"})`** — when the agent is idle (normal at `agent_end`), this starts a new turn via `agent.prompt()`. When the agent is streaming (rare at `agent_end` but possible with concurrent events), it queues via `agent.followUp()`. The `deliverAs` parameter is ignored in the idle path; `followUp` is used only during streaming. See [steering-vs-followup](../architecture/steering-vs-followup.md) for the full path matrix.
+4. **No compaction handling needed in base.** Pi's session log is append-only; `getBranch()` returns full history regardless of compaction. Extensions reading their state from session entries (like `@pi-dacmicu/todo`) survive compaction natively. Drivers with state outside the session log (like the planned `@pi-dacmicu/evolve`) can register their own `session_before_compact` handler directly. See [pi-session-architecture](../architecture/pi-session-architecture.md) and the [2026-05-12 audit](archive/research-2026-05-12-session-as-sot.md).
 
 Not a subagent. Not a subprocess. Not autonomous — the LLM still drives every turn; the driver only schedules *when* the next turn fires.
 
@@ -64,9 +64,10 @@ User asks for a complex task
 LLM creates TODO list via manage_todo_list tool
     ↓
 agent_end fires → DACMICU loop driver:
-    shouldContinue: todos.some(!completed)?  → YES
-    buildIterationPrompt → inject ONE prompt:
-       "Reassess the list. Update if needed. Then work the top item."
+    iterate(ctx): scan session for latest manage_todo_list result
+      todos.some(!completed)? → return prompt
+         "Reassess the list. Update if needed. Then work the top item."
+      else → return null (loop exits)
       ↓
 LLM reviews list (maybe edits via manage_todo_list),
 picks top item, works it, marks completed
@@ -83,11 +84,9 @@ All items done → loop terminates
 
 - **Loop driver runs on `agent_end`**, not as a tool the LLM calls. The LLM works items; the loop decides when to continue.
 - **One prompt per iteration — reassessment is a behavior, not a phase.** Earlier designs alternated WORK and REASSESS as separate turns with a phase-flipping state machine in the file. That was removed (commit `7ade7f8a`) — the forcing was illusory (the LLM could already return from REASSESS without modifying the list) and the token cost was double. The unified prompt instructs the LLM to reassess the list before picking the next item; the forcing is in the prompt text, where it belongs.
-- **Termination is purely objective.** `shouldContinue` returns `false` when `todos.every(completed)` or the list is empty. No `signal_loop_success` tool, no LLM-callable break. The LLM exits the loop only by changing objective state.
-- **State lives in two places:**
-  - **Session entries (LLM-visible history)** — tintinweb's `manage_todo_list` toolResult `details` contain the current list. This is what `loadTodosFromSession` scans on every iteration. Lost on compaction; restored from `compactionSummary`.
-  - **`<cwd>/.pi/dacmicu/state/<session-id>.json` (driver bookkeeping)** — base writes a marker under `driverId` when the loop is active, deletes it on exit. Today, todo writes nothing of its own — it's pure stateless reads of session entries.
-- **File-backed storage branches with `/fork` via session IDs.** Each session (including forks) gets a unique ID; the state file is keyed by ID. Per-branch isolation without the fragility of session-entry scanning.
+- **Termination is purely objective.** `iterate(ctx)` returns `null` when `todos.every(completed)` or the list is empty. No `signal_loop_success` tool, no LLM-callable break. The LLM exits the loop only by changing objective state.
+- **State lives in the session log.** tintinweb's `manage_todo_list` toolResult `details.todos` contain the current list. `loadTodosFromSession` reads the latest one via `ctx.sessionManager.getBranch().reverse()`. The session log is append-only; `getBranch()` returns full history regardless of compaction, so this scan is compaction-safe. See [pi-session-architecture](../architecture/pi-session-architecture.md). Today, `todo` writes nothing to the state file — it's pure stateless reads of session entries.
+- **The state file (`<cwd>/.pi/dacmicu/state/<session-id>.json`)** exists for drivers (like the planned `evolve`) that genuinely need state outside the conversation. `base` provides `readState`/`writeState`/`deleteState` helpers and cleans up the file on `session_shutdown`.
 - **No DAG, no auto-reminders, no active-task heuristics** — those fight loop-driver ownership.
 
 See [TODO base decision](#todo-base-tintinwebpi-manage-todo-list) below for why `tintinweb/pi-manage-todo-list` is the right primitive.
@@ -195,8 +194,8 @@ Pi loads all three extensions on startup. The LLM-visible surface is exactly one
 |---|---|---|
 | `manage_todo_list` tool | `tintinweb/pi-manage-todo-list` | LLM-facing CRUD for todo items; persists state as toolResult `details` in session entries |
 | State file `<cwd>/.pi/dacmicu/state/<session-id>.json` | `@pi-dacmicu/base` | Per-driver activation marker; durable across compaction. Today, todo writes nothing of its own here. |
-| `agent_end` driver | `@pi-dacmicu/todo` | On every assistant turn end: scans session entries for latest `manage_todo_list` toolResult, injects a unified `todo-iterate` prompt (reassess + work next) via `sendMessage({triggerTurn: true})` |
-| Exit condition | `@pi-dacmicu/todo` `shouldContinue` | Returns `false` iff `todos.every(completed)` — pure objective check, **no LLM-callable break tool** |
+| `agent_end` driver | `@pi-dacmicu/todo` | On every assistant turn end: `iterate(ctx)` scans session entries for latest `manage_todo_list` toolResult; if any item is not completed, returns a unified `todo-iterate` prompt (reassess + work next). Base dispatches via `sendMessage({triggerTurn: true})` |
+| Exit condition | `@pi-dacmicu/todo` `iterate` returns `null` | When `todos.every(completed)` or list is empty — pure objective check, **no LLM-callable break tool** |
 
 The LLM never knows DACMICU exists. It just uses `manage_todo_list` like in any other Pi session. The only behavioral difference: after every turn, DACMICU injects a unified "reassess + work next" prompt until the list is empty or fully completed. Reassessment is part of the prompt — the LLM is instructed to check the list every turn before picking an item. The legitimate exits are completing every item or clearing the list during reassessment. There is no LLM-callable break tool.
 
@@ -266,25 +265,18 @@ export function attachLoopDriver(pi: ExtensionAPI, driver: LoopDriver): () => vo
 
 This is a **convention + check**, not core enforcement. Documented limitation: if two non-DACMICU loop extensions are active (e.g. mitsuhiko's loop + latent-variable's auto-continue), DACMICU cannot prevent their collision. The user must not run multiple loop extensions simultaneously.
 
-## `before_agent_start` systemPrompt chaining
+## `before_agent_start` systemPrompt chaining (general Pi pattern; not currently used by DACMICU)
 
-`before_agent_start` handlers receive `event.systemPrompt` (the current prompt) and can return `{systemPrompt: string}` to replace it. **Each handler sees the previous handler's result.** If extension B returns just its own fragment, extension A's contribution is lost.
-
-**DACMICU's `appendSystemPrompt` helper** (in `@pi-dacmicu/base`):
+`before_agent_start` handlers receive `event.systemPrompt` (the current prompt) and can return `{systemPrompt: string}` to replace it. **Each handler sees the previous handler's result.** If extension B returns just its own fragment, extension A's contribution is lost. Any extension that wants to inject system-prompt context should append to `event.systemPrompt`, not replace it:
 
 ```typescript
-export function appendSystemPrompt(current: string, addition: string): string {
-  return addition ? `${current}\n\n${addition}` : current;
-}
-
-// Usage in a handler:
 pi.on("before_agent_start", async (event, ctx) => {
-  const todoContext = getTodoContext(ctx);
-  return { systemPrompt: appendSystemPrompt(event.systemPrompt, todoContext) };
+  const addition = "...";
+  return { systemPrompt: addition ? `${event.systemPrompt}\n\n${addition}` : event.systemPrompt };
 });
 ```
 
-All DACMICU packages use this helper. Documented contract: "Read `event.systemPrompt`, append your fragment, return the result. Never return just your fragment."
+**Note (2026-05-12):** Earlier drafts of `@pi-dacmicu/base` exported an `appendSystemPrompt` helper and registered a `before_agent_start` handler for system-prompt injection. Both were removed during the razor-sharp API pass (2026-05-11) because the TODO loop's iteration prompt already carries everything the LLM needs — there's no separate system-prompt context to maintain. The pattern above is kept for reference; future drivers can use it inline if needed.
 
 ## Key claims
 
@@ -333,6 +325,12 @@ This page is a **living document**. For the full research history (decision proc
 - [archive/](archive/) — All research sessions (evening 2–6) and prior audits.
 
 **Significant revisions**:
+- 2026-05-12: **Audit pass — session log as single source of truth**. User pushed back on session-scanning as "brittle and unidiomatic." Deep audit ([research-2026-05-12-session-as-sot](archive/research-2026-05-12-session-as-sot.md)) established the opposite: append-only session log + `getBranch()` is the canonical Pi cross-extension state primitive. Compaction never prunes the file; `getBranch()` sees through compaction natively. tintinweb has no `session_before_compact` handler — neither do we. Decisions taken:
+  - Merged `shouldContinue` + `buildIterationPrompt` into single `iterate(ctx) → Prompt | null` — one scan per turn, matches opencode's `oc check`-style pattern.
+  - Dropped `compactionSummary` from `LoopDriver` — was solving a non-problem.
+  - Dropped speculative `onLoopStart` / `onLoopEnd` lifecycle hooks — YAGNI; evolve adds them back if needed.
+  - Re-affirmed dependency on tintinweb — only real concern (brittleness) was a felt sense, not a real risk.
+  - New cross-cutting wiki page: [pi-session-architecture](../architecture/pi-session-architecture.md) documents the pattern for any future Pi extension work.
 - 2026-05-11: Collapsed WORK and REASSESS into one prompt per iteration (commit `7ade7f8a`). Reassessment is a behavior in the prompt text, not a separate turn. Deleted: phase state machine, sha256 stale-detection hash, `staleReassessCount`. Half the token cost, no state writes from `todo` itself, simpler LLM contract.
 - 2026-05-11: Razor-sharp API pass (commit `2da9a4f2`). Removed `DacmicuState.data`, `appendSystemPrompt`, `systemPromptAddition` callback, `Phase` type, `dacmicu:driver` sentinel custom-entry. `LoopDriver` methods now take only `ctx`. Sentinel-based `/dacmicu_status` was misleading post-compaction; now reads state file directly.
 - 2026-05-11: Removed `signal_loop_success` tool entirely. The LLM no longer has an escape hatch from any deterministic loop. Exit is determined by objective state only (`todos.every(completed)`, fitness target, etc.). User decision: the deterministic skeleton is the whole point — the LLM must be forced through reassessment until the work is genuinely done, and the legitimate way to "give up" is to clear the TODO list during REASSESS.

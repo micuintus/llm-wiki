@@ -38,7 +38,7 @@ Supersedes the single-extension decision in [implementation-plan](implementation
 
 | # | Package | LOC est. | Hard deps | Purpose |
 |---|---|---|---|---|
-| 1 | `@pi-dacmicu/base` | **~200** | none | Deterministic in-session loop primitive: `agent_end` driver, compaction preservation (CompactionResult + file fallback), abort detection, state rehydration, `appendSystemPrompt` helper, single-driver sentinel. **No LLM-callable break tool** — exit is determined by the driver's `shouldContinue` against objective state. Exports the runtime as a library for consumers. |
+| 1 | `@pi-dacmicu/base` | **~150** | none | Deterministic in-session loop primitive: `agent_end` driver with abort detection + `hasPendingMessages` yield, `session_shutdown` state-file cleanup, file-backed `readState`/`writeState`/`deleteState` for drivers that keep state outside the session log. **No LLM-callable break tool** — exit is determined by the driver's `iterate(ctx)` returning `null` against objective state. Exports the runtime as a library for consumers. Compaction is intentionally NOT handled here — Pi's append-only session log + `getBranch()` survives compaction natively. |
 | 2 | `@pi-dacmicu/todo` | ~150 | base; runtime-loads `pi-manage-todo-list` via `pi.extensions` | Deterministic TODO system. **Auto-attaches** the loop driver on extension load (no manual activation). The TODO list IS the loop's state machine; the outer loop checks `todos.some(!completed)`, reassesses validity, then works the next item. tintinweb owns the LLM-facing `manage_todo_list` tool; DACMICU owns turn scheduling. |
 | 3 | ~~`@pi-dacmicu/subagent`~~ | — | — | **Dropped 2026-05-08.** Replaced by `pi.events`-RPC dependency on `Hopsken/pi-subagents` (or `tintinweb/pi-subagents`). Their `createAgentSession` + ConversationViewer + agent-tree widget + cross-extension RPC is ~10K LOC of production-validated code we'd otherwise reinvent. See [concept § Subagent build-vs-reuse decision](concept.md#subagent-build-vs-reuse-decision-2026-05-08). |
 | 4 | `@pi-dacmicu/fabric` | ~250 | none | Bash callback infrastructure. Unix socket + `pi-callback` CLI on PATH + bash env injection via `tool_call` interceptor. Closes the mid-step recursive judgment gap; serves shell-pipeline composition. |
@@ -69,23 +69,26 @@ The TODO system is three independently-loaded Pi extensions with one-way couplin
 │  @pi-dacmicu/todo  (the loop *driver*)                       │
 │  - Reads tintinweb's toolResult via loadTodosFromSession     │
 │  - On every agent_end:                                       │
-│      shouldContinue → todos.some(!completed)                 │
-│      buildIterationPrompt → WORK or REASSESS prompt          │
-│      flips phase, calls sendMessage({triggerTurn:true})      │
-│  - Depends on base for attachLoopDriver / read/writeState    │
+│      iterate(ctx) → null  (all done) OR                      │
+│                  → { customType: "todo-iterate", content }   │
+│  - Pure read-from-session: zero state-file writes            │
+│  - Depends on base for attachLoopDriver + LoopDriver type    │
 └──────────────────────────────────────────────────────────────┘
                                  │ uses
                                  ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  @pi-dacmicu/base  (the loop *primitive*)                    │
 │  - attachLoopDriver(pi, driver): registers agent_end +       │
-│    before_agent_start + session_before_compact handlers      │
+│    session_shutdown (state-file cleanup) handlers            │
 │  - readState/writeState/deleteState: file-backed kv at       │
-│    .pi/dacmicu/state/<session-id>.json — durable across      │
-│    compaction, isolated per /fork                            │
-│  - appendSystemPrompt helper                                 │
+│    .pi/dacmicu/state/<session-id>.json — for drivers like    │
+│    evolve that keep state outside the session log            │
 │  - Knows nothing about TODOs; substrate for ANY driver       │
 │    (todo now; future ralph, evolve)                          │
+│                                                              │
+│  Compaction is intentionally NOT handled here. Pi's session  │
+│  log is append-only; getBranch() returns full history regard-│
+│  less of compaction. See pi-session-architecture for why.    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -104,17 +107,17 @@ LLM finishes a turn → agent_end fires
     │
     ▼
 base's agent_end handler runs
-    │ 1. calls todo.shouldContinue(ctx)
+    │ 1. calls todo.iterate(ctx)
     │      └─ todo runs loadTodosFromSession(ctx)
     │         scans branch for latest manage_todo_list toolResult
-    │         returns todos.some(!completed)
-    │
-    │ 2. calls todo.buildIterationPrompt(ctx)
-    │      └─ todo returns {customType: "todo-iterate",
-    │                       content: "reassess + update + work next item"}
+    │         IF every item completed (or list empty) → returns null
+    │         ELSE → returns {customType: "todo-iterate",
+    │                         content: "reassess + update + work next item"}
     │         (no state writes — todo is a pure read of session entries)
     │
-    │ 3. base calls pi.sendMessage(..., {triggerTurn:true})
+    │ 2. If null: base calls deleteState(driverId), returns. Loop exits.
+    │
+    │ 3. Otherwise: base calls pi.sendMessage(..., {triggerTurn:true})
     ▼
 Pi schedules next turn → LLM gets prompt → uses manage_todo_list
     │                                                  ↑
@@ -243,7 +246,7 @@ All listed primitives are verified against pi-mono source as of 2026-05-08.
 |---|---|---|
 | base | `pi.on("agent_end", ...)` | `packages/coding-agent/examples/extensions/plan-mode/index.ts:220` |
 | base | `pi.sendMessage({customType, content, display}, {triggerTurn:true, deliverAs:"followUp"})` | types `core/extensions/types.ts:372`; agent-session `core/agent-session.ts:1268-1295` |
-| base | `pi.on("session_before_compact", ...)` returning `{compaction:{summary, firstKeptEntryId, tokensBefore}}` | `extensions.md:413` |
+| base | (no `session_before_compact` handler — Pi's session log is append-only; `getBranch()` survives compaction natively. Drivers that need to inject a compaction summary can register their own handler.) | n/a |
 | base | `pi.on("session_start" / "session_tree", ...)` | `examples/extensions/todo.ts` |
 | base | `ctx.hasPendingMessages()` | types `core/extensions/types.ts:318` |
 | base | `ctx.signal?.aborted` for abort detection | `extensions.md`; subagent example `:339` |

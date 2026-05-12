@@ -10,6 +10,7 @@ Catalog of compiled pages for the pi-mono project.
 - [Component Interaction — Keystroke to Agent Loop and Back](architecture/component-flow.md) — Package boundary diagram and component responsibilities. *Updated: 2026-05-06*
 - [Subprocess + RPC + Custom Rendering](architecture/subprocess-rpc-rendering.md) — How `pi --mode rpc` + custom render preserves visibility for nested loops/subagents. *Updated: 2026-05-06*
 - [Steering vs Follow-up](architecture/steering-vs-followup.md) — Practical semantics: when each is polled, default keybindings, worked example. *Updated: 2026-05-06*
+- [Pi Session Architecture](architecture/pi-session-architecture.md) — Append-only log, `getBranch()` vs `buildSessionContext()`, cross-extension state sharing, compaction behavior. The Pi-side primitive most extensions need to understand. *Updated: 2026-05-12*
 
 ## Bugs
 - [Extension load error: TypeBox/Zod schema](bugs/typebox-zod-schema-error.md) — `inputSchema must be a Zod schema` blocks pi-web-access on Pi 0.67.2. *Updated: 2026-05-05*
@@ -30,11 +31,12 @@ Catalog of compiled pages for the pi-mono project.
 - [Modular Architecture](dacmicu/modular-architecture.md) — Package layout, dep DAG, module-isolation constraint, delivery strategies, verified primitives. *Updated: 2026-05-10*
 - [Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; why bash + `pi --print` is anti-pattern; subprocess + RPC for subagents. *Updated: 2026-05-10*
 - [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-10*
-- [Runtime Walkthrough](dacmicu/runtime-walkthrough.md) — Turn-by-turn detail of how tintinweb, `@pi-dacmicu/todo`, and `@pi-dacmicu/base` interact; `LoopDriver` API; exit paths; compaction behavior. *Updated: 2026-05-11*
+- [Runtime Walkthrough](dacmicu/runtime-walkthrough.md) — Turn-by-turn detail of how tintinweb, `@pi-dacmicu/todo`, and `@pi-dacmicu/base` interact; single-method `LoopDriver` API; exit paths; compaction behavior. *Updated: 2026-05-12*
 
 ### Archive — research history
 Full decision trail, verification passes, corrections, scale-down explorations, critical reviews:
-- **[Deep Implementation Review (2026-05-10)](dacmicu/archive/research-2026-05-10-deep-implementation-review.md)** — Primary-source verification of every load-bearing implementation claim. **2 CRITICAL findings**: pi-callback `wait:true` deadlocks by design; TODO state lost on compaction (silent breakage of central feature). 6 HIGH findings: nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID-not-result, single-driver invariant unenforced, etc. **Plan is not ready to build — needs redesign.**
+- **[Session-as-SOT Audit (2026-05-12)](dacmicu/archive/research-2026-05-12-session-as-sot.md)** — Deep audit triggered by pushback on session-scanning. Concluded: append-only log + `getBranch()` is the canonical Pi cross-extension state primitive. Compaction-summary machinery was solving a non-problem. Dropped `compactionSummary` + lifecycle hooks; merged `shouldContinue`+`buildIterationPrompt` into single `iterate()`. Re-affirmed tintinweb dependency.
+- **[Deep Implementation Review (2026-05-10)](dacmicu/archive/research-2026-05-10-deep-implementation-review.md)** — Primary-source verification of every load-bearing implementation claim. **2 CRITICAL findings**: pi-callback `wait:true` deadlocks by design; TODO state lost on compaction (now known to be wrong — see 2026-05-12 audit). 6 HIGH findings: nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID-not-result, single-driver invariant unenforced, etc.
 - [Critical Plan Review (2026-05-10)](dacmicu/archive/research-2026-05-10-critical-plan-review.md) — Hostile reading of the plan structure. 11 assumptions challenged. User overrode scope reduction (evolve + fabric stay).
 - [Verification Audit (2026-05-10)](dacmicu/archive/research-2026-05-10-comprehensive-verification-audit.md) — 70 claims checked, 17 false. pi-evolve provenance correction.
 - [archive/](dacmicu/archive/) — All sessions (evening 2–6) and prior audits.

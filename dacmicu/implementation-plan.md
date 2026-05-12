@@ -25,7 +25,15 @@ see_also:
 
 # DACMICU implementation plan for Pi
 
-> **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design — corrected by spawning subagent; (2) TODO state is lost on compaction — corrected by file-backed primary storage. 6 additional HIGH-severity findings (nonexistent `pi.wrapTool`, `subagents:rpc:spawn` returns ID not result, single-driver invariant unenforced, etc.) have been fixed in the canonical docs. This plan reflects the corrected designs.
+> **HISTORICAL. This plan describes the pre-2026-05-12 design.** The `LoopDriver` interface shown below (with `shouldContinue`, `buildIterationPrompt`, `systemPromptAddition`, `compactionSummary` and `appendSystemPrompt`) has been **superseded**. The current design is one method: `iterate(ctx) → Prompt | null`. See:
+> - [research-2026-05-12-session-as-sot](archive/research-2026-05-12-session-as-sot.md) — the audit that drove the simplification
+> - [runtime-walkthrough](runtime-walkthrough.md) — current API and turn-by-turn flow
+> - [modular-architecture](modular-architecture.md) — current package layout
+> - [concept § Log](concept.md#log) — chronological list of design changes
+>
+> The build sequence and effort estimates below remain useful context. The API snippets do not reflect current code; do not implement against them.
+
+> **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design — corrected by spawning subagent; (2) TODO state is lost on compaction — **NOW KNOWN TO BE WRONG**: the 2026-05-12 audit established that compaction does not prune the session file, and `getBranch()` survives compaction natively. The other 6 HIGH-severity findings remain valid. This plan reflects the older corrected designs.
 
 > Prior critical review: [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md).
 
