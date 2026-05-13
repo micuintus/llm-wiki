@@ -25,12 +25,7 @@ see_also:
 
 # DACMICU implementation plan for Pi
 
-> **HISTORICAL. This plan describes the pre-2026-05-12 design.** The `LoopDriver` interface shown below (with `shouldContinue`, `buildIterationPrompt`, `systemPromptAddition`, `compactionSummary` and `appendSystemPrompt`) has been **superseded**. The current design is one method: `iterate(ctx) → Prompt | null`. See:
-> - [research-2026-05-12-session-as-sot](archive/research-2026-05-12-session-as-sot.md) — the audit that drove the simplification
-> - [runtime-walkthrough](runtime-walkthrough.md) — current API and turn-by-turn flow
-> - [modular-architecture](modular-architecture.md) — current package layout
-> - [concept § Log](concept.md#log) — chronological list of design changes
->
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). Moved here during the wiki consolidation following the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims about the `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, `appendSystemPrompt`, `systemPromptAddition`, lifecycle hooks) reflect a pre-audit design that has since been collapsed to a single `iterate()` method. Read with that lens.
 > The build sequence and effort estimates below remain useful context. The API snippets do not reflect current code; do not implement against them.
 
 > **STOP. Two critical bugs found in deep review.** See [archive/research-2026-05-10-deep-implementation-review.md](archive/research-2026-05-10-deep-implementation-review.md): (1) pi-callback `wait:true` deadlocks by design — corrected by spawning subagent; (2) TODO state is lost on compaction — **NOW KNOWN TO BE WRONG**: the 2026-05-12 audit established that compaction does not prune the session file, and `getBranch()` survives compaction natively. The other 6 HIGH-severity findings remain valid. This plan reflects the older corrected designs.

@@ -1,5 +1,75 @@
 # Wiki Log
 
+## [2026-05-13] update | evolve design review pass — constraint-driven recalibration
+
+Follow-up to the morning's redesign. A multi-pass design review against three explicit constraints that hadn't been stated up-front in the wiki:
+
+1. **No algorithmic policy for variant selection** — LLM has full freedom; agent judgment over the ledger *is* the policy. The thesis bet.
+2. **Lightweight; dev's machine, dev's task** — target 5–20 iterations on a small project. Long-run viability concerns explicitly deferred.
+3. **TUI environment, foregrounded** — dev sits at Pi while the loop runs; not a detached daemon.
+
+Reviewer initially flagged 9 design flaws plus 11 plan-level recommendations. Against the three constraints, most either dissolved (forced-exploration contradicted #1; long-run viability didn't apply under #2; `pi evolve` CLI subcommand contradicted #3) or shrank to small concrete additions.
+
+### Decisions taken (recalibration)
+
+- **Constraints #1–3 now stated up-front** in `pi-evolve-extension.md` § Design constraints. Future reviewers do not relitigate decisions that flow directly from the constraints.
+- **Gate-failure amnesia is intended, documented as such.** A gate failure means *this implementation* failed; it does not mean the *approach* is bad. Writing a `GATE_FAILED` row would mislead the next subagent into discarding a viable idea. Rejected the reviewer's `GATE_FAILED`-row suggestion.
+- **No subagent timeout in v1.** Constraint #3: dev sees a hung iteration in the TUI, can Escape. Hardcoded timeout would be wrong for legitimate long compile+benchmark workloads. YAGNI. Rejected the reviewer's 30-min-timeout suggestion.
+- **`Parents` column stays self-reported.** Reference is unambiguous (run number ↔ branch bijective); truthfulness has same trust surface as Score and Core idea. Consistent.
+- **Parser fails gracefully + UI-notifies on malformed `evolve.md`.** ~10 LOC of try/catch around the markdown parser. Loop pauses cleanly, doesn't crash. Non-negotiable.
+- **Preflight verification is gating, not an open item.** Three throwaway probes (~30 min total) verify the tintinweb `subagents:rpc:spawn` contract, fresh-context spawn semantics, and `await`-able RPC behavior. Implementation does not start until all three pass.
+- **Fake-provider integration test accompanies implementation, not deferred.** ~50 LOC. Proves the orchestrator independent of tintinweb.
+- **Subagent prompt is load-bearing artifact code** — material changes go in `dacmicu/log.md` like any other API change.
+- **LOC budget honest about prompt:** ~80–100 LOC TS + ~60 lines subagent prompt.
+- **"Subagent decides" flagged as thesis bet**, not feature.
+
+### Deliverables
+
+- `implementations/pi-evolve-extension.md` — added § Design constraints, § *Why gate-failure amnesia is intended*, § Preflight verification, § Test harness; restructured trade-offs into "accepted by design" vs "open implementation gaps."
+- `dacmicu/log.md` — appended a second 2026-05-13 entry documenting the review pass and decisions.
+- `dacmicu/BUILD_TRACKER.md` — next-steps section restructured into Phase 0 (preflight) → Phase 1 (impl) → Phase 2 (test) → Phase 3 (dogfood).
+- `dacmicu/README.md` — open-questions block reframed around preflight; build-status row updated for gate-failure-amnesia and preflight-gated implementation.
+
+### Outcome
+
+Design unchanged in shape. What changed: explicitness of the trust surface (LLM judgment in 4 columns), explicit constraint statement (which kills several otherwise-reasonable patches), and preflight + test additions that make implementation safe to start.
+
+## [2026-05-13] update | evolve scope shift Variant A → Variant B (final design)
+
+User-driven design review of `@pi-dacmicu/evolve` during a working session. Concluded that the in-session loop substrate (Variant A) is wrong for *meta*-evolution: an orchestrator-in-main-session accumulates anchoring bias, bloats context, needs compaction logic, and collapses subagents to dumb executors. Agent judgment from the archive only works with fresh-context deciders.
+
+The final-locked design (after multiple iterations within the same session):
+
+### Decisions taken
+
+- **Substrate:** subagent-per-iteration via `pi.events` (`subagents:rpc:spawn`). tintinweb-first; no provider-abstraction layer.
+- **State:** single `evolve.md` SOT — goal + metric + **termination** + gates + inspiration + ledger. Subagent writes its own ledger row. Hardcoded `target/` subdir for the evolving repo.
+- **Tool surface:** **zero tools.** `evolve.md` existence is the activation signal. Dropped earlier candidates (`setup_evolve`, `init_experiment`, `run_experiment`, `log_experiment`, `record_variant`, `signal_evolve_success`).
+- **Termination by driver-side predicates** in `## Termination` section of `evolve.md`: `max_iterations` (required) + optional `target_score` + optional `stale_streak`. `iterate()` evaluates on every `agent_end`, returns `null` on any hit. No LLM escape hatch — same philosophy as `@pi-dacmicu/todo`'s objective-state exit.
+- **Subagent-decides:** orchestrator does not prime which branches to examine; subagent reads full ledger (incl. lower-scoring rows), chooses diverge/converge/combine. Branches are git-accessible for inspection.
+- **Gates as user shell commands** in `## Gates` section. Hard gates (compile/tests/no-crash) + fuzzy LLM gates as subprocess scripts (`pi --print -p ...`). Gate failure ⇒ delete branch, skip ledger row. Zero gate code in the extension.
+- **Ledger columns:** `Branch | Parents | Score | Core idea` (no Status). `Parents` records conceptual lineage (`main`, `#N`, or `#N,#M,...`), not git topology.
+- **Trust the LLM** for ledger integrity (no validation tool in v1).
+- **MATS terminology dropped from pi-dacmicu docs.** The MetaHarness MATS proposal remains the conceptual ancestor and is cited as such, but our docs do not market themselves as "MATS-style." We ship as `@pi-dacmicu/evolve`.
+- **Earlier Variant A scaffolding** (in pi-dacmicu repo: `packages/evolve/SCOPE.md` + 4 ts files + test stub, ~300 LOC partial) to be **discarded and rewritten** for ~80–100 LOC target. Implementation pending user green light.
+
+### Open implementation gaps documented
+
+- Subagent timeout / liveness check (no built-in `pi.events` RPC timeout)
+- Provider-not-installed silent-failure detection
+- Nested-subagent behavior with tintinweb (v1 documents fuzzy gates as subprocess pattern only, not nested subagents)
+- Loop continuation between iterations uses a cheap follow-up prompt per turn to re-fire `agent_end`. Base-side "continue without prompt" return value deferred unless it bites.
+
+### Deliverables
+
+- Rewritten: `implementations/pi-evolve-extension.md` — supersedes 2026-05-07 Variant A draft (510 LOC). Now describes Variant B design (~80–100 LOC target) with `## Termination` section, zero-tool surface, full subagent prompt template, gate protocol, trade-off analysis, and risk register.
+- Updated: `dacmicu/log.md` — 2026-05-13 entry refined with final decisions (signal tool dropped, termination predicates added).
+- Updated: `dacmicu/BUILD_TRACKER.md` — evolve row reflects zero tools and driver-side termination.
+- Updated: `dacmicu/README.md` — three-loops table de-MATS'd; code-lives-at path corrected to `~/.pi/agent/git/...` (the `pi install` location); build-status + open-questions blocks updated.
+- Updated: `dacmicu/spirit-vs-opencode.md` — line referencing "MATS-style code-evolution" de-MATS'd.
+- Updated: `ecosystem/evolve-systems.md`, `ecosystem/loop-extensions.md` — pi-evolve summary lines updated for zero-tool + termination predicates.
+- Updated: `index.md` — refreshed pi-evolve-extension summary line.
+
 ## [2026-05-12] session-as-SOT audit + LoopDriver simplification
 
 User pushed back on session-history scanning as a means of cross-extension state sync, calling it brittle and unidiomatic. A deep audit (primary sources: pi `session-manager.d.ts`, `session-manager.js`, `compaction.md`, `event-bus.d.ts`, and ecosystem issues #326, #2420, #1370, discussion #1546) concluded the opposite: **session-log scanning is the canonical Pi cross-extension state primitive.** Pi sessions are append-only files; `getBranch()` returns full history regardless of compaction; only `buildSessionContext()` applies the compaction filter for the LLM's view. tintinweb's own state reconstruction uses the identical scan.

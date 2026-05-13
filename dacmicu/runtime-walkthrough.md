@@ -8,15 +8,15 @@ sources:
   - "/tmp/pi-github-repos/tintinweb/pi-manage-todo-list@main/src/tool.ts"
   - "/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.d.ts"
 see_also:
-  - "modular-architecture.md"
-  - "concept.md"
+  - "README.md"
+  - "log.md"
   - "../architecture/pi-session-architecture.md"
   - "archive/research-2026-05-12-session-as-sot.md"
 ---
 
 # DACMICU runtime walkthrough
 
-Turn-by-turn detail of how `tintinweb/pi-manage-todo-list`, `@pi-dacmicu/todo`, and `@pi-dacmicu/base` interact during a live session. Companion to [modular-architecture.md](modular-architecture.md) — that page has the static structure; this page has the dynamic flow.
+Turn-by-turn detail of how `tintinweb/pi-manage-todo-list`, `@pi-dacmicu/todo`, and `@pi-dacmicu/base` interact during a live session. Companion to [README.md](README.md) — that page has the canonical design; this page has the dynamic flow at finer granularity.
 
 *Updated: 2026-05-12 — reflects the post-audit simplification: single `iterate()` method, no `compactionSummary`, no phase machine, no lifecycle hooks, no state writes from `todo`.*
 
@@ -211,8 +211,8 @@ The `todo` driver in particular has no per-session state (its scan is pure), so 
 
 ## See also
 
-- [Modular Architecture](modular-architecture.md) — static structure, dep DAG
-- [Concept](concept.md) — design philosophy
+- [README](README.md) — single-page canonical design (concept + architecture in one)
+- [log](log.md) — chronological design-decision history
 - [pi-session-architecture](../architecture/pi-session-architecture.md) — Pi's append-only session model in depth
 - [research-2026-05-12-session-as-sot](archive/research-2026-05-12-session-as-sot.md) — the audit behind this design
 - [TODO Tool APIs](../ecosystem/todo-tool-apis.md) — comparing tintinweb's tool to Claude Code's `TodoWrite` and opencode's `todowrite`/`todoread`

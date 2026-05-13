@@ -28,6 +28,10 @@ see_also:
 
 # DACMICU modular architecture
 
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). Moved here during the wiki consolidation following the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims about the `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, etc.) reflect a pre-audit design since collapsed to a single `iterate()` method.
+
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). This file was moved to archive during the wiki consolidation that followed the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims here about `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, `appendSystemPrompt`, `systemPromptAddition`, lifecycle hooks) reflect a pre-audit design that has since been collapsed to a single `iterate()` method. Read with that lens.
+
 > **WARNING: This architecture has been critically reviewed.** See [archive/research-2026-05-10-critical-plan-review.md](archive/research-2026-05-10-critical-plan-review.md) for challenges to every load-bearing assumption. Key findings: the 5-package structure is over-engineered for v1; `evolve` should be removed; `base` is better as an internal module than a standalone package; the "2-3 days" estimate is 3-5× too low.
 
 Supersedes the single-extension decision in [implementation-plan](implementation-plan.md). DACMICU ships as a modular monorepo of six small Pi packages with a small shared runtime library. The umbrella framing from [concept](concept.md) survives as architecture; the deliverable is six focused, composable packages.

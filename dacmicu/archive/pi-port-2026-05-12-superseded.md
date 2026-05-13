@@ -30,6 +30,10 @@ see_also:
 
 # Porting DACMICU to Pi
 
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). Moved here during the wiki consolidation following the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). The in-session-driver-vs-subprocess discussion remains accurate; specific API names are pre-audit.
+
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). This file was moved to archive during the wiki consolidation that followed the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims here about `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, `appendSystemPrompt`, `systemPromptAddition`, lifecycle hooks) reflect a pre-audit design that has since been collapsed to a single `iterate()` method. Read with that lens.
+
 Pi has one canonical port of DACMICU: the **in-session driver** pattern, where an extension listens on `agent_end` and calls `pi.sendMessage({ triggerTurn: true, deliverAs: "followUp" })` to drive the next iteration in the same session. This preserves the single-context-window guarantee from [concept](concept.md) and renders every nested tool call inline natively.
 
 The full architecture for the modular implementation lives in [modular-architecture](modular-architecture.md). This page focuses on **why this is the right port** and what alternatives exist.

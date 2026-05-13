@@ -23,15 +23,13 @@ Catalog of compiled pages for the pi-mono project.
 
 ## DACMICU
 
-**Start here**: [DACMICU Concept](dacmicu/concept.md) — what it is, two loop variants, umbrella framing. Then [Implementation Plan](dacmicu/implementation-plan.md) for build sequence.
+**Start here**: [DACMICU README](dacmicu/README.md) — single-page canonical reference. For the design-decision history, see [log](dacmicu/log.md).
 
-### Canonical docs
-- [Concept](dacmicu/concept.md) — Umbrella primitive: Ralph + FABRIC + TODO + evolve, loop variants, subagent reuse decision. *Updated: 2026-05-10*
-- [Implementation Plan](dacmicu/implementation-plan.md) — Build sequence: 5 packages, dependency order, reference implementations, open issues. *Updated: 2026-05-10*
-- [Modular Architecture](dacmicu/modular-architecture.md) — Package layout, dep DAG, module-isolation constraint, delivery strategies, verified primitives. *Updated: 2026-05-10*
-- [Pi Port](dacmicu/pi-port.md) — In-session driver as THE port; why bash + `pi --print` is anti-pattern; subprocess + RPC for subagents. *Updated: 2026-05-10*
+### Canonical docs (living)
+- **[README](dacmicu/README.md)** — single-page living docs: what DACMICU is, three loops, two variants, `LoopDriver` API, TODO loop anatomy, base/todo/tintinweb mesh, coupling contract, build status. *Updated: 2026-05-13*
+- [Log](dacmicu/log.md) — chronological design-decision record. Append-only. *Updated: 2026-05-13*
+- [Runtime Walkthrough](dacmicu/runtime-walkthrough.md) — turn-by-turn detail when you need exact event ordering and load-bearing details. *Updated: 2026-05-12*
 - [Spirit vs Opencode](dacmicu/spirit-vs-opencode.md) — Load-bearing ideas from opencode PR #20074 mapped to Pi; gaps and wins. *Updated: 2026-05-10*
-- [Runtime Walkthrough](dacmicu/runtime-walkthrough.md) — Turn-by-turn detail of how tintinweb, `@pi-dacmicu/todo`, and `@pi-dacmicu/base` interact; single-method `LoopDriver` API; exit paths; compaction behavior. *Updated: 2026-05-12*
 
 ### Archive — research history
 Full decision trail, verification passes, corrections, scale-down explorations, critical reviews:
@@ -79,7 +77,7 @@ Full decision trail, verification passes, corrections, scale-down explorations, 
 - [LLM Wiki](skills/llm-wiki.md) — LLM Wiki skill notes. *Updated: 2026-04-29*
 
 ## Implementations
-- [pi-evolve Extension](implementations/pi-evolve-extension.md) — Design sketch for `@pi-dacmicu/evolve` (510 LOC draft, untracked, unverified). *Updated: 2026-05-10*
+- [pi-evolve Extension](implementations/pi-evolve-extension.md) — **Design locked (Variant B, 2026-05-13)** for `@pi-dacmicu/evolve`: subagent-per-iteration, single `evolve.md` SOT with driver-side termination predicates, hardcoded `target/`, **zero tools**, gate-failure amnesia intentional. Constraints stated up-front. Implementation gated by 3 preflight probes. ~80–100 LOC TS + ~60 lines subagent prompt. Supersedes 510 LOC Variant A draft. *Updated: 2026-05-13*
 - [pi-callback Extension](implementations/pi-callback-extension.md) — Design for `@pi-dacmicu/fabric`: lightweight bash callback via Unix socket (~200 LOC). Closes the mid-step recursive judgment gap. *Updated: 2026-05-08*
 
 ## Raw Sources

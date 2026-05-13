@@ -202,7 +202,7 @@ If you build this:
 - [dacmicu/implementation-plan](../dacmicu/implementation-plan.md) — hook surface; reuse for evolve build
 - [architecture/loop-internals](../architecture/loop-internals.md) — why these hooks exist where they do
 - [architecture/subprocess-rpc-rendering](../architecture/subprocess-rpc-rendering.md) — alternative for fresh-process-per-variant if isolation needed
-- [implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — first MATS-style branched-variant Pi extension (510 LOC)
+- [implementations/pi-evolve-extension](../implementations/pi-evolve-extension.md) — `@pi-dacmicu/evolve` design (Variant B, locked 2026-05-13): subagent-per-iteration, single `evolve.md` SOT with driver-side termination predicates, zero tools, gate-failure amnesia intentional, ~80–100 LOC TS + ~60 lines subagent prompt. Implementation gated by 3 preflight probes.
 
 ### MetaHarness wiki (research)
 - [MATS proposal](../../../../MetaHarness/llm-wiki/proposals/mats.md) — the user's proposed minimal evolve system this build implements

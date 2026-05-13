@@ -28,6 +28,10 @@ see_also:
 
 # DACMICU — concept
 
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). Moved here during the wiki consolidation following the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims about the `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, etc.) reflect a pre-audit design since collapsed to a single `iterate()` method.
+
+> **SUPERSEDED 2026-05-12.** This page is historical record. The canonical current design lives at [`../README.md`](../README.md); the design-decision log is at [`../log.md`](../log.md). This file was moved to archive during the wiki consolidation that followed the [session-as-SOT audit](research-2026-05-12-session-as-sot.md). Specific claims here about `LoopDriver` API (`shouldContinue`, `buildIterationPrompt`, `compactionSummary`, `appendSystemPrompt`, `systemPromptAddition`, lifecycle hooks) reflect a pre-audit design that has since been collapsed to a single `iterate()` method. Read with that lens.
+
 DACMICU lets the LLM construct its own deterministic agent loop — emitting a script that drives further LLM iterations under explicit control rather than relying on the model to decide when to recurse. Originated as opencode PR #20074; under port to Pi as Voigt's main use case #4.
 
 ## Two loop variants — the load-bearing distinction

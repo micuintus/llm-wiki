@@ -3,8 +3,7 @@ title: DACMICU — spirit vs opencode implementation
 type: synthesis
 updated: 2026-05-10
 sources:
-  - "concept.md"
-  - "implementation-plan.md"
+  - "README.md"
   - "../architecture/pi-print-rpc-vs-oc-check.md"
   - "../architecture/subprocess-rpc-rendering.md"
   - "../implementations/pi-callback-extension.md"
@@ -12,12 +11,10 @@ sources:
   - "../concepts/deterministic-agent-control-mechanisms.md"
   - "../raw-sources/conversations/2026-05-07-pi-session-dacmicu-umbrella-fabric-rpc-callback.md"
   - https://github.com/anomalyco/opencode/pull/20074
-tags: [dacmicu, synthesis, comparison, fabric, ralph, spirit]
+tags: [dacmicu, synthesis, comparison, ralph, spirit]
 see_also:
-  - "concept.md"
-  - "modular-architecture.md"
-  - "implementation-plan.md"
-  - "pi-port.md"
+  - "README.md"
+  - "log.md"
   - "../implementations/pi-callback-extension.md"
   - "../implementations/pi-evolve-extension.md"
   - "../architecture/pi-print-rpc-vs-oc-check.md"
@@ -28,8 +25,8 @@ see_also:
 
 Synthesis page: separates the **load-bearing ideas** of opencode PR #20074
 from its bash-callback substrate, then maps the local pi-mono DACMICU stack
-against each idea. Companion to `concept.md` (what DACMICU is) and
-`implementation-plan.md` (how we build it).
+against each idea. Companion to [README](README.md) (what DACMICU is and
+how it's built).
 
 We are interested in the **spirit** of these mechanisms, not the specific
 opencode implementation.
@@ -47,7 +44,7 @@ synchronously inside a deterministic step). The latter is the real gap and
 is closed by the [pi-callback extension](../implementations/pi-callback-extension.md).
 
 FABRIC composition is an *independent* capability, not a DACMICU
-prerequisite (see Correction in [concept.md](concept.md)).
+prerequisite (see [README § two architectural variants](README.md)).
 
 ## DACMICU as umbrella
 
@@ -58,9 +55,12 @@ concerns:
 2. **FABRIC-style composition** — agent as a stage in a Unix pipeline.
 3. **TODO system base** — structured TODO list as the loop's natural state
    machine.
-4. **`micu pi evolve` foundation** — MATS-style code-evolution loop;
-   currently prototyped as `examples/extensions/pi-evolve.ts` (untracked,
-   ~510 LOC). See [pi-evolve-extension](../implementations/pi-evolve-extension.md).
+4. **`micu pi evolve` foundation** — code-evolution loop on git branches;
+   design revised 2026-05-13 to Variant B (subagent-per-iteration, single
+   `evolve.md` SOT with driver-side termination predicates, zero tools,
+   ~80–100 LOC target). Earlier `examples/extensions/pi-evolve.ts` draft
+   (~510 LOC, Variant A) superseded.
+   See [pi-evolve-extension](../implementations/pi-evolve-extension.md).
 
 The four are not separate features; they are specializations of one loop
 primitive with different termination predicates and execution modes.
@@ -167,7 +167,7 @@ with the "judgment vs control-flow split" thesis than opencode's bash
 form. Stop framing the missing CLI as a DACMICU prerequisite — it is a
 FABRIC prerequisite.
 
-See Correction in [concept.md](concept.md).
+See [README § two architectural variants](README.md) for the current framing.
 
 ## What to take forward
 
@@ -178,33 +178,27 @@ See Correction in [concept.md](concept.md).
    runtime via `@pi-dacmicu/base`'s exported `attachLoopDriver()` helper.
    This recovers opencode's uniformity at the implementation layer
    without forcing all consumers through one over-parameterized tool. See
-   [modular-architecture](modular-architecture.md).
-2. **Add a synchronous self-reach primitive.** Either `pi.askAgent({prompt, model?})`
-   in core, or the [pi-callback](../implementations/pi-callback-extension.md)
-   socket path (now packaged as `@pi-dacmicu/fabric`). Closes the largest
-   spirit gap.
-3. **Keep FABRIC on a separate, optional track.** `@pi-dacmicu/fabric`
-   ships the bash-callback path for shell composition, but does not gate
-   DACMICU. Ship base + todo + evolve first; ship fabric when use cases
-   demand it.
-4. **Document the divergence honestly.** Our DACMICU is opencode-DACMICU's
+   [README § build status](README.md).
+2. **Mid-step recursive judgment gap.** opencode's `oc check` primitive is
+   not yet matched in Pi. A [pi-callback](../implementations/pi-callback-extension.md)
+   socket path was explored but is **deferred** — not in the current tree.
+   The gap remains open for now; the TODO loop works around it by
+   reassessing in the prompt text rather than via an external check.
+3. **Document the divergence honestly.** Our DACMICU is opencode-DACMICU's
    *event-substrate cousin*, not a port. Stronger on visibility,
    persistence, single-context; weaker on uniformity (recovered via the
    shared library, not via one tool) and mid-step recursive judgment
-   (closed by fabric).
+   (still open).
 
 ## See also
 
-- [concept](concept.md) — what DACMICU is, four-aspect umbrella framing
-- [modular-architecture](modular-architecture.md) — six-package monorepo,
-  dep DAG, module-isolation constraint, delivery strategies
-- [implementation-plan](implementation-plan.md) — build sequence against
-  the modular architecture
+- [README](README.md) — single-page living docs for the current DACMICU design
+- [log](log.md) — chronological design-decision history
 - [pi-callback-extension](../implementations/pi-callback-extension.md) —
   closes the recursive self-reach gap
 - [pi-evolve-extension](../implementations/pi-evolve-extension.md) —
-  current MATS-style consumer; should collapse onto `dacmicu_loop` once
-  umbrella is built
+  current MATS-style consumer; should collapse onto `@pi-dacmicu/evolve` once
+  built
 - [pi-print-rpc-vs-oc-check](../architecture/pi-print-rpc-vs-oc-check.md)
   — substrate comparison
 - [deterministic-agent-control-mechanisms](../concepts/deterministic-agent-control-mechanisms.md)
