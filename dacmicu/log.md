@@ -34,6 +34,35 @@ Open implementation items: subagent timeout/liveness, provider-detection short-c
 
 Detail: this entry. Code commit: pending. Wiki commit: pending.
 
+## 2026-05-13 (preflight)
+
+**Preflight source-read of `tintinweb/pi-subagents@master`. Three assumptions corrected before any implementation.**
+
+Source read of `src/cross-extension-rpc.ts` (95 LOC), `src/agent-manager.ts` (482 LOC), `src/agent-runner.ts` (479 LOC), and `src/index.ts` (1894 LOC). All three preflight checks resolved by source — no live probe needed for v1; deferred as the first commit of implementation phase to catch any silent drift.
+
+**P1 — `subagents:rpc:spawn` contract.** Initial design's payload guess `{id, prompt, cwd}` was wrong in three concrete ways:
+- Payload is `{requestId, type, prompt, options?}`; `requestId` scopes the reply.
+- `type` is required (an agent type from the registry; `"general-purpose"` for evolve).
+- `options.description` is required (`SpawnOptions`).
+- Reply channel is **per-request**: `subagents:rpc:spawn:reply:${requestId}`.
+- Reply payload follows pi-mono envelope: `{success: true, data: {id: agentId}}` — `agentId` is distinct from `requestId`.
+- `cwd` is not in the RPC; subagent inherits from `ExtensionContext`.
+- Completion is a separate event (`subagents:completed` / `subagents:failed`), keyed by `data.id === agentId`.
+
+**P2 — Fresh-context spawn.** `SpawnOptions.inheritContext` defaults to `false`; design uses default. When `true`, `buildParentContext(ctx)` is prepended to the subagent's prompt — we explicitly set `false` so future maintainers can't accidentally turn it on without flagging.
+
+**P3 — `await`-able RPC.** `pi.events.on()` returns an unsubscribe function. Two-phase await pattern (spawn reply → completion event) is straightforward Promise wrapping. Confirmed.
+
+**Bonus findings baked into design:**
+- Avoid `options.isolation: "worktree"` — subagent must operate on `target/`'s shared git state, not a temp worktree. Default (no isolation) is correct.
+- Use `subagents:rpc:ping` (5 s timeout) for provider-not-installed detection before first spawn.
+- Pin protocol version `2` (current); higher versions require a wiki update before they can be relied on.
+
+**Updates:**
+- `pi-evolve-extension.md` — § Loop driver behavior now has runnable-looking pseudocode against the real contract; § Subagent provider dependency fully rewritten with verified protocol; § Preflight verification rewritten as a completion log; § Open implementation gaps updated (provider contract resolved, ping-detection + protocol-version-pin added).
+
+Detail: this entry. Code commit: pending. Wiki commit: pending.
+
 ## 2026-05-13 (later)
 
 **Design review pass — recalibration against explicit constraints.**

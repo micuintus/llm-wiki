@@ -168,7 +168,8 @@ The `## Gates` section is shell commands run with full shell access by the subag
 ## Loop driver behavior
 
 ```typescript
-// Pseudocode
+// Pseudocode — contract verified against tintinweb/pi-subagents@master
+//   src/cross-extension-rpc.ts and src/agent-manager.ts (preflight P1, 2026-05-13)
 attachLoopDriver(pi, {
   iterate: async (ctx) => {
     if (!fs.existsSync("evolve.md")) return null;
@@ -187,14 +188,23 @@ attachLoopDriver(pi, {
     if (passesTarget(parsed)) return null;
     if (staleStreakHit(parsed)) return null;
 
-    // Spawn subagent and wait
-    const spawnId = crypto.randomUUID();
-    pi.events.emit("subagents:rpc:spawn", {
-      id: spawnId,
+    // Two-phase async: (1) spawn RPC → agentId, (2) await completion event
+    const requestId = crypto.randomUUID();
+    const agentId = await rpcCall(pi.events, "subagents:rpc:spawn", requestId, {
+      type: "general-purpose",
       prompt: buildSubagentPrompt(parsed),
-      cwd: process.cwd(),
+      options: {
+        description: `evolve iteration ${parsed.ledger.length + 1}`,
+        isBackground: true,
+        inheritContext: false,  // explicit; default but load-bearing
+        // no isolation: subagent must operate on target/'s shared git state
+      },
     });
-    await waitForCompletion(pi.events, spawnId);
+
+    await waitForAgentCompletion(pi.events, agentId);
+    // ↑ resolves on subagents:completed where data.id === agentId
+    //   rejects on subagents:failed where data.id === agentId
+    //   AGENT_FAILED is surfaced via pi.ui.notify; loop continues to next iteration
 
     // Return a brief prompt so main session has a turn → next agent_end fires
     return {
@@ -206,6 +216,17 @@ attachLoopDriver(pi, {
     };
   },
 });
+
+// Helper — wraps the per-request reply channel pattern
+async function rpcCall(events, channel, requestId, payload) {
+  const replyChannel = `${channel}:reply:${requestId}`;
+  const reply = await new Promise((resolve) => {
+    const unsub = events.on(replyChannel, (r) => { unsub(); resolve(r); });
+    events.emit(channel, { requestId, ...payload });
+  });
+  if (!reply.success) throw new Error(reply.error);
+  return reply.data.id;  // agentId
+}
 ```
 
 **Why a follow-up prompt instead of `null` between iterations?** Base's `attachLoopDriver` only re-fires when the main session has another `agent_end`. If `iterate()` returns `null`, no message is sent and no further turn happens — the loop ends. To continue, `iterate()` must send a prompt to the main session, the LLM responds, `agent_end` fires, `iterate()` runs again, and either spawns the next subagent or stops via a predicate.
@@ -317,12 +338,13 @@ stale_streak:     stop when bestValue hasn't improved in N consecutive rows
 
 ### Open implementation gaps (must address during build)
 
-1. **Subagent provider contract is unverified.** `pi.events` channel name (`subagents:rpc:spawn`), payload shape, completion event semantics — all guessed from ecosystem context. **Preflight verification is the first commit before any other implementation work.** See *Preflight verification* below.
-2. **Provider-not-installed silent failure.** Emitting `subagents:rpc:spawn` with no listener fails silently. Short detection timeout on first spawn (5s) → surface "no subagent provider responded — install `tintinweb/pi-subagents`."
+1. ~~Subagent provider contract unverified.~~ **Resolved** by preflight source-read (2026-05-13). See § Preflight verification and § Subagent provider dependency for the verified protocol.
+2. **Provider-not-installed detection.** Use the `subagents:rpc:ping` RPC with a 5 s timeout before first spawn. If no reply, surface *"`@pi-dacmicu/evolve` requires `tintinweb/pi-subagents`. Install it and reload Pi."* via `pi.ui.notify` and return `null` from `iterate()`.
 3. **Parser failure must pause cleanly, not crash.** ~10 LOC of try/catch around the markdown parser + `pi.ui.notify` on error. Without this, a malformed row crashes the extension inside `agent_end` — much worse failure mode than "loop paused with clear error."
 4. **Subagent crash recovery.** Subagent crashes mid-iteration → orphan branch in `target/`. Mitigation: subagent prompt step 2 sweeps orphans on each iteration. Sufficient for v1.
 5. **`evolve.md` is single-writer-assumed.** Editing during a subagent run races. Document: user pauses (Escape) before editing.
 6. **Fuzzy LLM gates use subprocess, not nested subagents.** v1 documents fuzzy gates as `pi --print -p ...` subprocess calls. Nested-subagent behavior with tintinweb is unverified and not required for the dev-machine use case.
+7. **Protocol-version pin.** Tintinweb's `PROTOCOL_VERSION` is currently `2`. On startup, ping and verify `data.version === 2`. If higher, surface a notice; the design is for protocol 2. Future major bumps require a wiki update before they can be relied on.
 
 ### Subagent-decides vs orchestrator-decides
 
@@ -342,20 +364,32 @@ A `pi evolve` CLI subcommand (detached process) was considered and rejected per 
 
 Skills handle setup (`evolve-init`) and teardown (`evolve-finalize`), not the loop itself.
 
-## Preflight verification (must run before implementation)
+## Preflight verification
 
-Three preflight checks. None of them is a tool; all are throwaway probes. Implementation work does not start until all three pass.
+Three preflight checks, all **completed by source read 2026-05-13** against `tintinweb/pi-subagents@master`. Initial design assumptions were wrong in three concrete ways; design updated before any implementation began.
 
-**P1. Verify tintinweb `subagents:rpc:spawn` contract.**
-- Source read: clone `tintinweb/pi-subagents`, grep for `subagents:rpc:spawn`, read the handler's expected payload and reply contract. ~15 min.
-- Live probe: ~20 LOC throwaway extension that emits `subagents:rpc:spawn` with our guessed payload and logs every event the bus surfaces. ~15 min.
-- Outputs: confirmed channel names, payload schema, completion event semantics. If contract differs from the design's assumption, the design updates before code starts.
+**P1. Tintinweb `subagents:rpc:spawn` contract — VERIFIED.**
+- Source: `src/cross-extension-rpc.ts` (95 LOC) defines the channel and envelope. `src/agent-manager.ts` defines `SpawnOptions`. `src/index.ts` emits completion events from the manager's `onComplete` callback.
+- **Corrections to original assumption** (now baked into § Subagent provider dependency):
+  - Payload shape is `{requestId, type, prompt, options?}`, not `{id, prompt, cwd}`.
+  - `type` (agent type from registry, e.g. `"general-purpose"`) is required.
+  - `options.description` is required (`SpawnOptions`).
+  - Reply channel is per-request: `subagents:rpc:spawn:reply:${requestId}`.
+  - Reply payload follows pi-mono envelope: `{success: true, data: {id: agentId}}` — `agentId` is distinct from `requestId`.
+  - `cwd` is not in the RPC; subagent inherits from `ExtensionContext`.
+  - Completion is a separate event (`subagents:completed` / `subagents:failed`) keyed by `data.id === agentId`.
 
-**P2. Verify fresh-context spawn.** Confirm a subagent spawned this way inherits no parent context (message history, tool state). If it does, the entire design premise needs revisiting. The P1 probe can answer this by inspecting whatever the subagent's first turn sees.
+**P2. Fresh-context spawn — VERIFIED.**
+- Source: `src/agent-runner.ts` line 375. `SpawnOptions.inheritContext` defaults to `false`. When false, the subagent's `AgentSession` starts with empty messages — no parent prompt, no parent tool state. When `true`, `buildParentContext(ctx)` is prepended.
+- Design uses the default; we also set it explicitly for clarity.
 
-**P3. Verify `await`-able RPC.** Confirm `iterate()` can `await` completion of a `pi.events` RPC cleanly without blocking other event traffic. Same probe.
+**P3. `await`-able RPC — VERIFIED.**
+- Source: `pi.events.on()` returns an unsubscribe function (verified in `cross-extension-rpc.ts`'s `handleRpc`). Standard sync-friendly pattern.
+- Two-phase pattern: `await` the spawn reply on the per-request channel → `await` the completion event filtered by agent id. Both `await`-able as Promises wrapping `events.on()`.
 
-All three are answerable in ~30 minutes of work with one cloned repo and one ~20-line probe. If any fails, the design rewrites before code.
+**Bonus finding: avoid `isolation: "worktree"`.** `SpawnOptions.isolation === "worktree"` creates a temp git worktree and runs the subagent there. We do not want this — our subagent must read and create branches in `target/`'s shared git state visible to subsequent iterations. The default (no isolation) is correct. Documented in § Subagent provider dependency.
+
+**Live probe — optional, deferred.** A 20-line throwaway extension to confirm runtime behavior matches the source read. Not gating: the source read is authoritative; the live probe would only catch silently-deprecated behavior. Will run as the first commit of the implementation phase to catch any drift before depending on the contract.
 
 ## Test harness (must accompany implementation)
 
@@ -376,12 +410,35 @@ Programmatic skeleton + dialogic surface. Skeleton stays minimal; setup/teardown
 
 ## Subagent provider dependency
 
-Per the wiki (DACMICU log 2026-05-08), we depend rather than build. Targets `tintinweb/pi-subagents` (preferred — superset of Hopsken). Protocol (guessed; **see Preflight P1 before relying on this**):
+Per the wiki (DACMICU log 2026-05-08), we depend rather than build. Targets `tintinweb/pi-subagents` (preferred — superset of Hopsken).
 
-- Emit `pi.events.emit("subagents:rpc:spawn", { id, prompt, cwd })`
-- Receive reply via `subagents:rpc:spawn:reply` (or whatever tintinweb returns)
-- Wait for `subagents:completed` or `subagents:failed` event keyed by spawn ID
-- Subagent's final assistant message extractable from completion payload — but we don't rely on it; the subagent writes the ledger row to disk
+**Protocol — verified against `tintinweb/pi-subagents@master` source 2026-05-13 (preflight P1).**
+
+Two-phase async pattern:
+
+1. **Spawn RPC** (request/reply on per-request channel):
+   - Emit `pi.events.emit("subagents:rpc:spawn", { requestId, type, prompt, options })`
+     - `requestId` (string, required) — UUID; scopes the reply channel
+     - `type` (string, required) — agent type from registry. Use `"general-purpose"` for evolve
+     - `prompt` (string, required) — the full subagent prompt
+     - `options.description` (string, required) — UI label, e.g. `"evolve iteration N"`
+     - `options.isBackground` (bool) — `true` for evolve (no UI interaction needed)
+     - `options.inheritContext` (bool) — `false` for evolve (fresh context per iteration)
+     - **do not set** `options.isolation: "worktree"` — subagent must operate on `target/`'s shared git state
+   - Receive reply on `subagents:rpc:spawn:reply:${requestId}`:
+     - Success: `{ success: true, data: { id: agentId } }` — `agentId` is distinct from `requestId`
+     - Failure: `{ success: false, error: string }`
+
+2. **Completion event** (keyed by agent id):
+   - Subscribe to `subagents:completed` and `subagents:failed`
+   - Filter by `data.id === agentId`
+   - Payload: `{ id, type, description, result, error, status, toolUses, durationMs, tokens? }`
+   - We **do not rely on `result`** — the subagent writes the ledger row to disk
+   - On `subagents:failed`: surface `error` via `pi.ui.notify`, continue loop to next iteration (gate-failure amnesia parallel: agent failure ≠ approach failure)
+
+**Protocol version is `2`** at the time of writing. `tintinweb/pi-subagents@master/src/cross-extension-rpc.ts` exposes `PROTOCOL_VERSION` and the design depends on this envelope shape.
+
+**Provider-not-installed detection:** before the first spawn, RPC-ping `"subagents:rpc:ping"` with a 5 s timeout. If no reply, surface *"`@pi-dacmicu/evolve` requires `tintinweb/pi-subagents`. Install it and reload Pi."* via `pi.ui.notify` and return `null` from `iterate()`.
 
 ## Cross-references
 
