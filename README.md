@@ -22,10 +22,14 @@ pi install git:github.com/micuintus/llm-wiki
 
 **Everyone else:**
 ```bash
-# Copy one file. Start ingesting.
-curl -L https://raw.githubusercontent.com/micuintus/llm-wiki/main/llm-wiki/SKILL.md \
-  > ~/your-agent/skills/llm-wiki.md
+# Copy the skill directory (SKILL.md + its lazy-loaded recipes). Start ingesting.
+curl -L https://github.com/micuintus/llm-wiki/archive/refs/heads/main.tar.gz \
+  | tar -xz --strip-components=1 -C ~/your-agent/skills/ llm-wiki-main/llm-wiki
 ```
+
+That lands `~/your-agent/skills/llm-wiki/SKILL.md` with its
+`references/` alongside, so the lazy-loaded recipes resolve. (`SKILL.md`
+is the only always-loaded file — the rest is read on demand.)
 
 ## What you get
 

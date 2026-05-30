@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.8] — 2026-05-30
+
+### Fixed
+- **Non-Pi install** now fetches the whole `llm-wiki/` directory (tarball
+  → `tar`) instead of just `SKILL.md`. The single-file copy left the
+  lazy-loaded `references/*` recipes unresolvable; the skill pointed at
+  paths that weren't there.
+
 ## [1.4.7] — 2026-05-30
 
 ### Fixed
