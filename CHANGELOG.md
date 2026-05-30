@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.7] — 2026-05-30
+
+### Fixed
+- **Page-type consistency** — `pi-session-recipe.md` used `type: session`,
+  which isn't in the canonical type list and would be rejected by the
+  type-validity lint; switched to `source` (matching the agent-session
+  recipe). `SCHEMA.template.md` page-types list was missing `stub`.
+
+### Added
+- **`log.md` vs git** clarified in SKILL.md: it's the VCS-independent,
+  semantic operation log — keep entries about what knowledge changed,
+  not the file diffs git already records.
+- **Parallel ingest** note: dispatch one subagent per independent
+  source, but serialize writes to shared files (`index.md`, `log.md`,
+  `raw-sources/index.md`).
+
 ## [1.4.6] — 2026-05-30
 
 ### Added
