@@ -50,7 +50,10 @@ in `log.md` so wiki state is transparent.
 
    HTML documentation sites (Sphinx, Doxygen, ReadTheDocs) and auth-
    walled sources (Confluence, Google Docs) may require extraction or
-   credentials. Redact credentials from any copied material.
+   credentials. Redact credentials from any copied material. For
+   proprietary or confidential sources, prefer reference-by-path over
+   copying, and don't reproduce confidential identifiers in any page
+   you may publish.
 
 2. **Compile.** Distill the source into pages in `<topic>/`. Merge with
    targeted edits (don't rewrite); append to `sources:`; bump `updated:`.
