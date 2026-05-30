@@ -96,7 +96,7 @@ jq -r '.. | strings' "$SESSION" |
 ```markdown
 ---
 title: "Session YYYY-MM-DD: <topic>"
-type: session
+type: source
 updated: YYYY-MM-DD
 sources:
   - /absolute/path/to/session.jsonl

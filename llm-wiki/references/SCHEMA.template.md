@@ -29,7 +29,7 @@ By subject, not by kind. New topics need user approval.
 
 ## Page types
 
-- `concept`, `decision`, `bug`, `open-question`, `source`, `reference`, `synthesis` — see SKILL.md.
+- `concept`, `decision`, `bug`, `open-question`, `source`, `reference`, `synthesis`, `stub` — see SKILL.md.
 - Concept variants (taxonomy, implementation walkthrough) — see `quality.md`. Not new types; just shapes a `concept` may take.
 
 ## Lint rules
