@@ -67,6 +67,18 @@ in `log.md` so wiki state is transparent.
    If only register happened (no compile yet), log as
    `## [YYYY-MM-DD] register | <title>` and note "compile pending".
 
+   `log.md` is the wiki's VCS-independent operation log: it works when
+   the wiki isn't a git repo, stays readable without shelling out to
+   git, and in a shared repo isolates wiki ops from surrounding code
+   commits. Keep entries **semantic** — what knowledge changed and why
+   — not file-level; git already records the diff.
+
+For many independent sources, ingest can run in parallel: dispatch one
+subagent per source to compile concurrently. Serialize writes to the
+shared files (`index.md`, `log.md`, `raw-sources/index.md`) through one
+agent or a final merge pass — concurrent edits to the same file
+conflict.
+
 Frontmatter (mandatory): `title`, `type`, `updated`, `sources`. Types:
 `concept`, `decision`, `bug`, `open-question`, `source`, `reference`,
 `synthesis`, `stub`. Use `stub` for sources registered but not yet
