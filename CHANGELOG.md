@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.6] — 2026-05-30
+
+### Added
+- **Confidentiality guidance** in SKILL.md: for proprietary or
+  confidential sources, prefer reference-by-path over copying and
+  don't reproduce confidential identifiers in any page you may
+  publish.
+
+### Changed
+- **`references/code-source-recipe.md`** examples now use a fictional
+  generic engine rather than identifiers from a private codebase.
+
 ## [1.4.3] — 2026-05-09
 
 ### Fixed
