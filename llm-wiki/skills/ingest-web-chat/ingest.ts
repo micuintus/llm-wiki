@@ -5,13 +5,21 @@
 
 import { chromium, type BrowserContext, type Page } from "rebrowser-playwright-core";
 import TurndownService from "turndown";
+import { spawn } from "node:child_process";
 import { mkdir, writeFile, readFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { extractClaude, CLAUDE_HOSTS, type RawChat } from "./providers/claude.ts";
 import { extractGemini, GEMINI_HOSTS } from "./providers/gemini.ts";
+import { extractChatgpt, CHATGPT_HOSTS } from "./providers/chatgpt.ts";
 import { extractFallback } from "./providers/_fallback.ts";
+import { assertNotGated, GateError } from "./providers/gate.ts";
+
+// Below this much readable text the page is a shell, a redirect target or an
+// empty conversation, not something worth a wiki entry.
+const MIN_TEXT_CHARS = 200;
 
 interface Args {
   url: string;
@@ -33,14 +41,67 @@ function parseArgs(argv: string[]): Args {
   return { url: rest[0], out: resolve(args.out ?? process.cwd()) };
 }
 
-function pickProvider(url: string): "claude" | "gemini" | "unknown" {
+type Provider = "claude" | "gemini" | "chatgpt" | "fallback";
+
+function pickProvider(url: string): Provider {
   const host = new URL(url).hostname;
   if (CLAUDE_HOSTS.some((h) => host.includes(h))) return "claude";
   if (GEMINI_HOSTS.some((h) => host.includes(h))) return "gemini";
-  return "unknown";
+  if (CHATGPT_HOSTS.some((h) => host.includes(h))) return "chatgpt";
+  return "fallback";
 }
 
 const CDP_ENDPOINT = process.env.LLM_WIKI_CDP ?? "http://localhost:9222";
+const CHROME_PROFILE = join(homedir(), ".chrome-llm-wiki");
+
+async function cdpAlive(endpoint: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${endpoint}/json/version`, {
+      signal: AbortSignal.timeout(1500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+const LAUNCH_HINT =
+  `Start one and re-run:\n` +
+  `  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \\\n` +
+  `    --remote-debugging-port=9222 --user-data-dir="${CHROME_PROFILE}"\n` +
+  `--user-data-dir is required: since Chrome 136 the flag is ignored on the\n` +
+  `default profile. Sign in to the chat provider once in that Chrome.`;
+
+async function ensureCdp(endpoint: string): Promise<void> {
+  if (await cdpAlive(endpoint)) return;
+
+  const port = Number(new URL(endpoint).port || 9222);
+  const chrome =
+    process.env.LLM_WIKI_CHROME ??
+    (process.platform === "darwin"
+      ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      : "google-chrome");
+
+  // Only auto-launch the default endpoint and profile. A custom LLM_WIKI_CDP
+  // means someone else owns that browser.
+  const ours = endpoint === "http://localhost:9222";
+  if (!ours || (chrome.includes("/") && !existsSync(chrome))) {
+    throw new Error(`No Chrome listening at ${endpoint}.\n${LAUNCH_HINT}`);
+  }
+
+  console.error(`[ingest] no CDP at ${endpoint}, launching Chrome (${CHROME_PROFILE})`);
+  spawn(
+    chrome,
+    [`--remote-debugging-port=${String(port)}`, `--user-data-dir=${CHROME_PROFILE}`],
+    { detached: true, stdio: "ignore" },
+  ).unref();
+
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if (await cdpAlive(endpoint)) return;
+  }
+  throw new Error(`Chrome did not open ${endpoint} within 30s.\n${LAUNCH_HINT}`);
+}
 
 async function withContext<T>(
   fn: (ctx: BrowserContext) => Promise<T>,
@@ -61,9 +122,11 @@ async function extract(url: string): Promise<RawChat> {
     const page: Page = await ctx.newPage();
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+      await assertNotGated(page);
       if (provider === "claude") return await extractClaude(page, url);
       if (provider === "gemini") return await extractGemini(page, url);
-      return await extractFallback(page, url, provider);
+      if (provider === "chatgpt") return await extractChatgpt(page, url);
+      return await extractFallback(page, url);
     } finally {
       await page.close();
     }
@@ -175,10 +238,27 @@ async function main() {
   }
 
   console.error(`[ingest] ${args.url}`);
-  const chat = await extract(args.url);
-  if (!chat.turns.length) {
+  await ensureCdp(CDP_ENDPOINT);
+
+  let chat: RawChat;
+  try {
+    chat = await extract(args.url);
+  } catch (err) {
+    if (err instanceof GateError) {
+      console.error(`[ingest] ${err.message}`);
+      console.error(`[ingest] ${err.hint}`);
+      process.exit(1);
+    }
+    throw err;
+  }
+
+  const readable = chat.turns.map((t) => t.text).join("\n").trim();
+  if (readable.length < MIN_TEXT_CHARS) {
     console.error(
-      "[ingest] No turns extracted. Is your CDP Chrome running and signed in to the provider?",
+      `[ingest] Refusing to write: only ${readable.length} readable characters from ${args.url} (need ${MIN_TEXT_CHARS}).`,
+    );
+    console.error(
+      "[ingest] The page is probably a sign-in wall, an empty conversation or an app shell. Nothing was written.",
     );
     process.exit(1);
   }
@@ -194,6 +274,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(`[ingest] ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });
