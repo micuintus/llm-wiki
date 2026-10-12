@@ -26,7 +26,8 @@
   ],
   "pi": {
     "skills": [
-      "./llm-wiki"
+      "./llm-wiki",
+      "./llm-wiki/skills"
     ]
   }
 }
