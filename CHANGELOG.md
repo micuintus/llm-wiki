@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.9] — 2026-10-23
+
+### Added
+- **ChatGPT extractor** for `ingest-web-chat`: dedicated provider
+  alongside the Claude/Gemini fallback, with a gate guard (a
+  Cloudflare challenge page was once saved as a chat and reported
+  success) and CDP auto-launch for cold Chrome starts.
+
+### Fixed
+- **Subskill discovery**: Pi treats a directory containing `SKILL.md`
+  as a skill root and does not recurse, so
+  `llm-wiki/skills/ingest-web-chat` was never discovered; folded the
+  shadowing shim in and exposed it in the manifest.
+- Scroll Gemini history to top before extracting.
+
 ## [1.4.8] — 2026-05-30
 
 ### Fixed
