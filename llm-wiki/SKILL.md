@@ -93,7 +93,7 @@ the correction pattern — in `references/quality.md`.
 - **Agent sessions** — Pi (JSONL trees with forks): see
   `references/pi-session-recipe.md`. Claude Code, Gemini CLI, opencode:
   see `references/agent-session-recipe.md`. Lazy-load.
-- **Web LLM chats** — `skills/ingest-web-chat/` (URL → markdown via CDP,
+- **Web LLM chats** — now the separate `@micuintus/ingest-web-chat` package (URL → markdown via CDP,
   enterprise-SSO-safe).
 - **Binaries** (figures, audio, checkpoints) — bucket per kind, always
   pair with a companion `.md`; cite the `.md`, not the binary.

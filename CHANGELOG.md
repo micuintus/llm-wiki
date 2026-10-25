@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.10] — 2026-10-25
+
+### Changed
+- **`ingest-web-chat` moves out** into its own repo and package
+  ([`micuintus/ingest-web-chat`](https://github.com/micuintus/ingest-web-chat),
+  npm `@micuintus/ingest-web-chat`), extracted with full history.
+  Install it with `pi install npm:@micuintus/ingest-web-chat`.
+  The old path keeps a stub pointer for this release only.
+
 ## [1.4.9] — 2026-10-23
 
 ### Added
