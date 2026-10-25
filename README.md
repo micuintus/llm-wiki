@@ -43,8 +43,10 @@ path in the skill text, never loaded until you actually need it.
 **Code-source recipe** (lazy-loaded) — grep+cite-by-line conventions
 for when the source is a repository rather than prose.
 
-**Web chat ingestion** — Claude.ai, ChatGPT, Gemini, Le Chat via CDP.
-Ships as a separate subskill (`skills/ingest-web-chat/`).
+**Web chat ingestion** — Claude.ai, ChatGPT, Gemini via CDP. A
+separate package:
+[`ingest-web-chat`](https://github.com/micuintus/ingest-web-chat)
+(`pi install npm:@micuintus/ingest-web-chat`).
 
 > The lazy-loaded subskills sleep forever until you wake them. (Don't
 > forget to kiss these sleeping beauties.)

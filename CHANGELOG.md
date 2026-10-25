@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.11] — 2026-10-25
+
+### Removed
+- **`ingest-web-chat` stub.** A second skill with the same name
+  collides with the real one once both are installed. Install
+  `@micuintus/ingest-web-chat` for web chat ingestion.
+
 ## [1.4.10] — 2026-10-25
 
 ### Changed
