@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.12] — 2026-10-26
+
+### Changed
+- Package author and LICENSE copyright now read
+  `Michael Voigt (micu)`, matching the other packages.
+
 ## [1.4.11] — 2026-10-25
 
 ### Removed
